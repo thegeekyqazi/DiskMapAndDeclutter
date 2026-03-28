@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Declutter & Visualizer</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+    <style>
+        body { background-color: #f5f5f5; }
+        .app-header { margin-top: 40px; margin-bottom: 40px; }
+        #chart-container { 
+            width: 100%; 
+            height: 75vh; 
+            background: white; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        /* Loading Spinner */
+        #loader { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="row app-header center-align">
+        <h4><i class="material-icons medium vertical-align-bottom">pie_chart</i> Storage Visualizer</h4>
+        <p class="grey-text">Map your directories and identify massive folders.</p>
+    </div>
+
+    <div class="row card-panel">
+        <div class="input-field col s9">
+            <i class="material-icons prefix">folder</i>
+            <input id="target_path" type="text" value="">
+            <label for="target_path">Target Directory Path</label>
+        </div>
+        <div class="input-field col s3 center-align">
+            <button id="scan-btn" class="btn waves-effect waves-light blue darken-2" style="width: 100%;">
+                Scan Drive
+                <i class="material-icons right">search</i>
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col s12">
+            <div id="chart-container">
+                <div id="loader" class="preloader-wrapper big active">
+                    <div class="spinner-layer spinner-blue-only">
+                        <div class="circle-clipper left"><div class="circle"></div></div>
+                        <div class="gap-patch"><div class="circle"></div></div>
+                        <div class="circle-clipper right"><div class="circle"></div></div>
+                    </div>
+                </div>
+                <div id="sunburst-chart" style="width: 100%; height: 100%;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script>
+    document.getElementById('scan-btn').addEventListener('click', async () => {
+        const targetPath = document.getElementById('target_path').value;
+        const loader = document.getElementById('loader');
+        const chartDiv = document.getElementById('sunburst-chart');
+        const btn = document.getElementById('scan-btn');
+
+        // UI Reset
+        Plotly.purge(chartDiv);
+        loader.style.display = 'block';
+        btn.disabled = true;
+
+        try {
+            // Call your local FastAPI bridge
+            const response = await fetch(`http://localhost:8000/api/scan?target_path=${encodeURIComponent(targetPath)}`);
+            
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || "Failed to fetch data");
+            }
+
+            const data = await response.json();
+
+            // Plotly Configuration
+            const trace = [{
+                type: "sunburst",
+                ids: data.ids,
+                labels: data.labels,
+                parents: data.parents,
+                values: data.values,
+                branchvalues: 'total', // CRITICAL: Tells Plotly that parent size = sum of children
+                maxdepth: 3,
+                textinfo: "label+value+percent parent",
+                hovertemplate: '<b>%{label}</b><br>Size: %{value} bytes<br>Parent: %{parent}<extra></extra>',
+                marker: { line: { width: 1, color: 'white' } }
+            }];
+
+            const layout = {
+                margin: { l: 0, r: 0, b: 0, t: 0 },
+                sunburstcolorway: ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"],
+                paper_bgcolor: 'transparent'
+            };
+
+            // Render the chart
+            Plotly.newPlot(chartDiv, trace, layout, {responsive: true});
+
+        } catch (error) {
+            M.toast({html: `Error: ${error.message}`, classes: 'red rounded'});
+            console.error(error);
+        } finally {
+            loader.style.display = 'none';
+            btn.disabled = false;
+        }
+    });
+</script>
+
+</body>
+</html>
