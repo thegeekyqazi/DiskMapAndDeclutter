@@ -24,8 +24,8 @@ class DeleteRequest(BaseModel):
 # --- Visualization Endpoint ---
 @app.get("/api/scan")
 def scan_directory(target_path: str = "."):
-    if not os.path.exists(target_path):
-        raise HTTPException(status_code=404, detail="Directory not found")
+    """Scans the target directory and returns a flattened storage tree for visualization."""
+    validate_directory(target_path)
     try:
         raw_tree = build_storage_tree(target_path)
         return flatten_for_plotly(raw_tree)
@@ -36,8 +36,7 @@ def scan_directory(target_path: str = "."):
 @app.get("/api/duplicates")
 def get_duplicates(target_path: str = "."):
     """Runs the 3-stage funnel and returns the list of duplicates."""
-    if not os.path.exists(target_path):
-        raise HTTPException(status_code=404, detail="Directory not found")
+    validate_directory(target_path)
     try:
         return find_duplicates(target_path)
     except PermissionError as e:
@@ -51,3 +50,10 @@ def delete_files(request: DeleteRequest):
     
     # Call the new deletion function
     return delete_selected_files(request.file_paths)
+
+def validate_directory(target_path: str):
+    """Helper function to validate the provided directory path."""
+    if not os.path.exists(target_path):
+        raise HTTPException(status_code=404, detail="Directory not found")
+    if not os.path.isdir(target_path):
+        raise HTTPException(status_code=400, detail="Provided path is not a directory")

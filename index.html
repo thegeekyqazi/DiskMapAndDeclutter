@@ -115,6 +115,15 @@
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
+    // Helper: get error message
+    async function getErrorMessage(response, defaultMsg) {
+        try {
+            const errorData = await response.json();
+            return errorData.detail || defaultMsg;
+        } catch {
+            return defaultMsg;
+        }
+    }
 
     // ==========================================
     // LOGIC: VISUALIZER TAB
@@ -129,7 +138,10 @@
 
         try {
             const response = await fetch(`http://localhost:8000/api/scan?target_path=${encodeURIComponent(path)}`);
-            if (!response.ok) throw new Error("Failed to map directory");
+            if (!response.ok) {
+                const errorMessage = await getErrorMessage(response, "Failed to map directory");
+                throw new Error(errorMessage);
+            }
             const data = await response.json();
 
             const trace = [{
@@ -164,7 +176,10 @@
 
         try {
             const response = await fetch(`http://localhost:8000/api/duplicates?target_path=${encodeURIComponent(path)}`);
-            if (!response.ok) throw new Error("Failed to scan for duplicates");
+            if (!response.ok) {
+                const errorMessage = await getErrorMessage(response, "Failed to scan for duplicates");
+                throw new Error(errorMessage);
+            }
             const duplicates = await response.json();
 
             if (duplicates.length === 0) {
