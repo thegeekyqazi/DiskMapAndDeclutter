@@ -1,164 +1,242 @@
-# StorageVisualizer / Declutter
+# Storage Visualizer / Declutter
 
-This repo now contains two versions of the app:
+Storage Visualizer is a local-first Windows storage review app. It helps you understand what is taking space, flag folders that need extra caution, find likely duplicate files, find older large files, inspect file contents safely, and keep your own review notes while you decide what to clean up manually.
 
-- A legacy Python prototype in the repo root
-- A new `.NET 8` read-only local app in `src/StorageVisualizer.App`
+The current app is designed to be useful before it becomes destructive. It does **not** delete, move, rename, or modify files in the folders you scan. The only write behavior in the current app is saving your local review state, such as favorites, hidden items, reviewed items, decisions, and notes, into the app's own workspace folder.
 
-The new `.NET` app is the recommended path forward. It keeps the current storage-visualization behavior, but moves the backend to a Windows-friendly stack and tightens the safety model without installing services, requesting elevation, or deleting anything.
+## The Idea
 
-## What Exists Today
+Most storage tools jump too quickly from "scan" to "delete." This project is trying to solve the step in between:
 
-### 1. Legacy Python prototype
+- show where the space is
+- highlight things that look worth reviewing
+- help you keep track of what you already checked
+- surface duplicate and stale-file candidates
+- let you inspect file contents before acting
+- keep strong guardrails so a mistake in the app does not become a mistake on your PC
 
-These files are still present as a reference implementation:
+The app is meant to be a safe review workspace first, and only later a cleanup tool if the safety model is strong enough.
 
-- `ScannerEngine.py`
-- `server.py`
-- `index.html`
+## What The App Can Do Right Now
 
-They provide:
+### 1. Folder scan and storage map
 
-- Recursive directory scanning
-- Basic path safety checks
-- A FastAPI endpoint
-- A Plotly-based sunburst UI
+The main scan:
 
-### 2. New `.NET 8` local app
+- walks a folder tree
+- totals folder sizes
+- builds a Plotly sunburst chart
+- shows only child folders above a minimum size threshold
+- adds warnings and counters so the chart is not just visual noise
 
-The active migration target lives here:
+What you see in the UI:
 
-- `StorageVisualizer.sln`
-- `src/StorageVisualizer.App`
+- a large sunburst map of the scanned folder
+- summary counters
+- scan warnings
+- scan facts
+- node-level hover details
 
-This new app:
+This is powered by:
 
-- Runs on `http://127.0.0.1:5080`
-- Serves both the UI and the API from one local process
-- Serves the app shell locally, while Plotly is still loaded from its CDN in this phase
-- Scans folders in read-only mode
-- Returns Plotly-ready sunburst data
-- Loads installed-program locations from the Windows uninstall registry
-- Flags folders that overlap installed-program paths as protected
-- Performs bounded best-effort file-lock checks during scans
-- Returns scan warnings and counters alongside the chart data
-- Returns read-only cleanup recommendations for:
-  - cache-like folders
-  - installer or archive-heavy download-style folders
-  - stale large folders
-  - large flat folders
-  - log-heavy folders
-- Can query a separate privileged-agent boundary over a local named pipe
-- Falls back to loopback-only TCP in this dev phase when the machine denies named-pipe connects
-- Blocks known system paths such as `C:\Windows`
-- Skips reparse points so it does not walk symlinks or junctions
-- Skips noisy developer folders such as `.git`, `node_modules`, and `__pycache__`
+- [Program.cs](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.App/Program.cs)
+- [DirectoryScanner.cs](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.App/Services/DirectoryScanner.cs)
+- [SunburstFlattener.cs](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.App/Services/SunburstFlattener.cs)
+
+### 2. Safety-aware scan metadata
+
+The scanner does more than count bytes. It also tracks signals that make a folder riskier or more interesting to review:
+
+- protected installed-program overlap
+- unreadable items
+- skipped reparse points
+- skipped noisy folders such as `.git`, `node_modules`, and `__pycache__`
+- best-effort file lock hints
+- counts of direct files, log files, archive files, installer files, and large files
+- latest content write time
+
+This is why the app can say "this folder is large" and also "this folder overlaps an installed app path" or "some files here may be in use."
+
+### 3. Review recommendation cards
+
+After a scan, the app creates read-only review cards for folders that look worth checking manually. These are suggestions, not actions.
+
+Current recommendation types include:
+
+- cache-like folders
+- installer or archive stashes
+- stale large folders
+- large flat folders
+- log-heavy folders
+
+Each card gives:
+
+- a title
+- a category
+- a reason
+- an estimated size
+- supporting signals
+
+This logic lives in [CleanupRecommendationEngine.cs](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.App/Services/CleanupRecommendationEngine.cs).
+
+### 4. Reviewed / hidden / favorite workflow
+
+Each review card can now be tracked locally. You can:
+
+- mark a card as favorite
+- mark a card as reviewed
+- hide a card
+- attach a manual decision such as keep, later, archive, or delete later
+- add a private note
+
+This is useful because storage cleanup is usually multi-pass work, not a one-click action.
+
+Important detail:
+
+- this state is saved only to the app workspace
+- the scanned folders are not modified
+
+This is implemented in:
+
+- [ReviewEntry.cs](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.App/Models/ReviewEntry.cs)
+- [ReviewWorkspaceStore.cs](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.App/Services/ReviewWorkspaceStore.cs)
+
+### 5. Duplicate file finder
+
+The duplicate analysis is read-only. It does not remove anything. It works like this:
+
+- enumerate files under the current scan root
+- keep only files above the duplicate-size threshold
+- group by exact size
+- hash a partial chunk first
+- hash the full file to confirm likely duplicates
+- show the top duplicate groups
+
+For each duplicate group, the app shows:
+
+- files in the group
+- size per file
+- estimated reclaimable duplicate bytes
+- protection flags
+- possible lock flags
+
+This feature is implemented in [DuplicateFileAnalysisService.cs](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.App/Services/DuplicateFileAnalysisService.cs).
+
+### 6. Stale file finder
+
+The stale-file view is also read-only. It looks for files that are:
+
+- above a minimum size
+- old enough based on last write / last access activity
+- inside the current scan root
+
+This helps you surface files that might be archive candidates or just forgotten clutter.
+
+What it returns:
+
+- file path
+- file size
+- extension
+- last activity time
+- protection flags
+- possible lock flags
+
+This feature is implemented in [StaleFileAnalysisService.cs](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.App/Services/StaleFileAnalysisService.cs).
+
+### 7. File inspector
+
+The file inspector lets you look deeper at a file before you decide it is useless.
+
+Current behaviors:
+
+- text-like files show the first readable lines
+- `.zip` files show archive entry names
+- binary files show a short hex preview
+- metadata is returned alongside the preview
+
+This makes the app more than just a size viewer. You can actually ask, "What is this file?" without leaving the tool.
+
+This feature is implemented in [FileInspectionService.cs](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.App/Services/FileInspectionService.cs).
+
+### 8. Optional helper boundary
+
+There is a separate helper process for future privileged work. Right now it exists mainly as a boundary and status surface, not as a destructive engine.
+
+Current state:
+
+- the main app works without it
+- the UI shows whether it is online
+- allowed commands are still tightly restricted
+- destructive commands are denied in the current phase
+
+This lives in:
+
+- [StorageVisualizer.Agent](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.Agent)
+- [StorageVisualizer.Protocol](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.Protocol)
 
 ## Current Safety Model
 
-The new `.NET` app is intentionally conservative.
+This is the part that matters most.
 
-Implemented guardrails:
+The app currently includes these guardrails:
 
-- Localhost-only hosting
-- No delete operations
-- No move operations
-- No elevation
-- No Windows service install
-- No registry writes
-- No shell integration
-- Reparse-point root scanning is blocked
-- `C:\Windows` scanning is blocked
-- Permission and I/O errors are swallowed per-entry instead of crashing the whole scan
-- Installed-program detection is read-only
-- File-lock detection is best-effort and capped
-- Cleanup recommendations are suggestions only and never queue actions
-- Recommendation filtering and sorting happen in the UI only; they never affect the filesystem
-- Privileged agent commands are allowlisted
-- Dev-phase agent auth uses a shared token
-- The app prefers a local named pipe and can fall back to loopback-only TCP on `127.0.0.1` in this phase
-- The agent transport policy is configurable as `Auto`, `PipeOnly`, or `LoopbackOnly`
-- Destructive commands are denied in this phase even if the agent is running
+- local hosting only on `127.0.0.1`
+- no delete operations
+- no move operations
+- no rename operations
+- no elevation prompts
+- no Windows service install in the main app flow
+- no registry writes
+- blocked scanning for `C:\Windows`
+- blocked reparse-point root scanning
+- skipped reparse points during traversal
+- bounded best-effort lock checking
+- installed-program path protection from uninstall registry data
+- review-state writes limited to the app's own data folder
+- file inspection restricted to paths inside the current scan root
+- duplicate and stale-file analyses restricted to the current scan root
 
-This means the current app is safe to treat as a visual inspection tool only.
+What this means in practice:
 
-## Architecture
+- the app is useful
+- the app is not harmless because any software can still have bugs
+- but the current design is intentionally biased toward review and analysis, not cleanup execution
 
-### Current implementation
+## What The UI Is Trying To Be
 
-- `Program.cs`
-  - Hosts the local ASP.NET Core app
-  - Serves static files from `wwwroot`
-  - Exposes:
-    - `GET /health`
-    - `GET /api/scan?targetPath=...`
+The front end is not just a chart page anymore. It is now a storage review workspace with five main areas:
 
-- `Services/DirectoryScanner.cs`
-  - Normalizes and validates the requested path
-  - Enforces safety guardrails
-  - Recursively enumerates files and directories
-  - Totals folder sizes
-  - Adds metadata for:
-    - protected installed-program paths
-    - suspected locked files
-    - skipped reparse points
-    - unreadable items
+1. Scan panel  
+Enter a root path and run a safe scan.
 
-- `Services/SunburstFlattener.cs`
-  - Converts the tree into:
-    - `ids`
-    - `labels`
-    - `parents`
-    - `values`
-  - Adds:
-    - `nodeDetails`
-    - `summary`
+2. Storage map  
+See the scanned folder tree as a sunburst chart.
 
-- `Services/CleanupRecommendationEngine.cs`
-  - Walks the scanned tree after facts are collected
-  - Produces read-only review candidates for:
-    - cache-like folders
-    - installer or archive-heavy download-style folders
-    - stale large folders
-    - large flat folders with many direct files
-    - log-heavy folders
-  - Does not execute any filesystem operation
+3. Review cards  
+Track the folders you care about with favorite / reviewed / hidden state and notes.
 
-- `wwwroot/index.html`
-  - Hosts the local UI
-  - Calls the API with a relative path
-  - Renders the Plotly sunburst chart
-  - Shows warnings, summary counters, and per-node metadata in hover details
-  - Shows whether the privileged agent is online and what it is allowed to do
-  - Lets you filter and sort recommendation candidates by category, priority, size, and search text
+4. File analysis workspace  
+Run duplicate and stale-file analysis.
 
-- `StorageVisualizer.Protocol`
-  - Shared named-pipe contract types used by both the app and the agent
+5. File inspector  
+Preview file contents safely before deciding what to do manually.
 
-- `StorageVisualizer.Agent`
-  - Separate process boundary for future privileged work
-  - Uses a local named pipe when available
-  - Exposes a loopback-only TCP fallback in this dev phase
-  - Honors a transport policy of `Auto`, `PipeOnly`, or `LoopbackOnly`
-  - Uses shared-token authentication in this dev phase
-  - Logs requests to a local audit log
-  - Allows only `Ping` and `GetStatus`
-  - Explicitly denies destructive commands
+The current front end is in:
 
-### Planned production direction
+- [index.html](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.App/wwwroot/index.html)
+- [app.css](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.App/wwwroot/app.css)
+- [app.js](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/src/StorageVisualizer.App/wwwroot/app.js)
 
-The production architecture from the migration plan is **not** fully implemented yet. The intended next phases are:
+## How To Start The App
 
-1. Keep the UI unprivileged and local
-2. Keep scanning read-only by default
-3. Add a separate privileged component only for destructive actions
-4. Replace localhost HTTP for privileged actions with named-pipe IPC
-5. Add Windows-native delete flows only after explicit confirmation and logging
-6. Package the app cleanly for Windows deployment
+### Prerequisites
 
-Those steps are intentionally deferred because they carry more operational and safety risk than the current scanner.
+You need:
 
-## Run The New `.NET` App
+- .NET 8 SDK
+- Windows
+
+### Start the main app
 
 From the repo root:
 
@@ -169,12 +247,18 @@ dotnet run --project .\src\StorageVisualizer.App\StorageVisualizer.App.csproj
 Then open:
 
 ```text
-http://127.0.0.1:5080
+http://127.0.0.1:5080/
 ```
 
-## Run The Agent
+Health check:
 
-This is optional in phase 2. The app works without it, but the UI will show the agent as offline.
+```text
+http://127.0.0.1:5080/health
+```
+
+### Optional: start the helper process
+
+The main app does not require the helper, but you can run it if you want the helper status panel to come online.
 
 From the repo root:
 
@@ -182,40 +266,82 @@ From the repo root:
 dotnet run --project .\src\StorageVisualizer.Agent\StorageVisualizer.Agent.csproj
 ```
 
-The agent:
+## How To Use The App
 
-- listens on the `storage-visualizer-agent-sawaa-diskmap` named pipe
-- listens on `127.0.0.1:5091` as a dev fallback when named-pipe connects are denied on the machine
-- respects the transport policy configured in:
-  - `src/StorageVisualizer.App/appsettings.json`
-  - `src/StorageVisualizer.Agent/agentsettings.json`
-- authenticates requests with the shared token configured in:
-  - `src/StorageVisualizer.App/appsettings.json`
-  - `src/StorageVisualizer.Agent/agentsettings.json`
-- writes audit entries to `logs\agent-audit.log`
-- still refuses destructive commands
+### Basic workflow
 
-## Build
+1. Start the app.
+2. Paste a folder path you actually own.
+3. Run a scan.
+4. Review the warnings first.
+5. Use the storage map to spot large areas.
+6. Use the review cards to track what deserves manual follow-up.
+7. Run duplicate analysis if you suspect repeated files.
+8. Run stale-file analysis if you want to find old large files.
+9. Use the file inspector before deciding a file is junk.
+10. Save your review state so you can come back later.
+
+### Good folders to start with
+
+- Downloads
+- Desktop
+- Documents
+- project workspaces
+- personal media folders you control
+
+### Folders you should not expect the app to let you scan
+
+- `C:\Windows`
+- reparse-point roots
+
+## API Surface
+
+The app serves both the UI and a small local API.
+
+### `GET /health`
+
+Returns a simple app health response.
+
+### `GET /api/scan?targetPath=...`
+
+Runs the main safe scan and returns:
+
+- sunburst arrays
+- node details
+- summary data
+- review recommendations
+
+### `GET /api/review-state?rootPath=...`
+
+Loads saved local review state for the current scan root.
+
+### `POST /api/review-state`
+
+Saves local review state for the current scan root.
+
+### `GET /api/analysis/duplicates?rootPath=...`
+
+Runs duplicate analysis under the current root.
+
+### `GET /api/analysis/stale-files?rootPath=...`
+
+Runs stale-file analysis under the current root.
+
+### `GET /api/analysis/file-inspect?rootPath=...&targetPath=...`
+
+Inspects a file inside the current root and returns a safe preview.
+
+### `GET /api/agent/status`
+
+Returns helper status and transport information.
+
+## Build Commands
 
 ```powershell
 dotnet build .\src\StorageVisualizer.Protocol\StorageVisualizer.Protocol.csproj
 dotnet build .\src\StorageVisualizer.Agent\StorageVisualizer.Agent.csproj
 dotnet build .\src\StorageVisualizer.App\StorageVisualizer.App.csproj
 ```
-
-## Verified Behavior
-
-The new `.NET` app has been locally verified for:
-
-- `GET /health` returns `200`
-- `GET /api/scan?targetPath=.` returns `200`
-- `GET /api/scan?targetPath=C:\Windows` returns `403`
-- `GET /api/scan` now returns `summary`, `nodeDetails`, and `recommendations`
-- `GET /api/scan` emits recommendation candidates for a controlled cache-like scan fixture
-- `GET /api/scan` emits the refined categories `Cache-like data`, `Installer or archive stash`, `Stale large folder`, and `Log-heavy folder` from a controlled fixture
-- `GET /api/agent/status` reports the agent as offline when it is not running
-- `GET /api/agent/status` reports the configured transport policy and enabled transports
-- `GET /api/agent/status` reports the agent as online when the agent is running, using loopback fallback on this machine
 
 ## Repo Layout
 
@@ -234,24 +360,52 @@ The new `.NET` app has been locally verified for:
 |   |   |-- Properties
 |   |   `-- wwwroot
 |   |-- StorageVisualizer.Protocol
-|   |   `-- *.cs
 |   `-- StorageVisualizer.Agent
-|       |-- Program.cs
-|       |-- Services
-|       `-- agentsettings.json
 `-- README.md
 ```
 
+## Legacy Python Prototype
+
+The repo still contains the original Python prototype in the root:
+
+- [ScannerEngine.py](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/ScannerEngine.py)
+- [server.py](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/server.py)
+- [index.html](c:/Users/Sawaa/Documents/DiskMapAndDeclutter/index.html)
+
+That version is useful as historical reference, but the `.NET` app is now the main implementation.
+
 ## What Is Not Implemented Yet
 
-These production features are still pending:
+These are still intentionally missing:
 
-- Hardened OS-level pipe ACL enforcement
-- Privileged Windows service
-- `IFileOperation` shell-aware delete
+- real delete execution
+- move execution
+- rename execution
 - Recycle Bin integration
-- VSS integration
-- MSI or MSIX packaging
-- Signing and update flow
+- shell-aware `IFileOperation` delete flows
+- hardened OS-level pipe ACL enforcement
+- a production Windows service model
+- installer packaging and signing
+- update flow
 
-That is deliberate. The current goal is to migrate the scanner safely before any destructive capability exists.
+Those are exactly the parts that can go wrong in expensive ways, so they are being deferred until the analysis and safety layers are solid.
+
+## Current Limitations
+
+- Plotly is still loaded from a CDN, so the app shell is local but not fully offline
+- lock detection is best-effort, not authoritative
+- installed-program protection depends on usable uninstall registry install paths
+- last-access timestamps on Windows can be approximate
+- duplicate analysis is capped on purpose for responsiveness
+- file inspection is intentionally shallow and conservative
+
+## Practical Summary
+
+Right now this project is best understood as:
+
+- a safe local storage map
+- a duplicate and stale-file review tool
+- a lightweight file inspection tool
+- a personal review workspace for cleanup planning
+
+It is **not** yet a real cleaner, and that is deliberate.
