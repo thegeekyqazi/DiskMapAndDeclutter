@@ -1,0 +1,41 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{0EF7F93D-746A-4E30-86A2-12A00FD7DCBC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StorageVisualizer.App", "src\StorageVisualizer.App\StorageVisualizer.App.csproj", "{FA7FD4A8-D7E9-4057-AF14-CA68AB066C0D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StorageVisualizer.Protocol", "src\StorageVisualizer.Protocol\StorageVisualizer.Protocol.csproj", "{F2DEDCFD-71EF-4C40-B596-2FE2E68D4475}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StorageVisualizer.Agent", "src\StorageVisualizer.Agent\StorageVisualizer.Agent.csproj", "{43E7CC52-2935-4D00-8F7E-B2B5B6760D72}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FA7FD4A8-D7E9-4057-AF14-CA68AB066C0D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FA7FD4A8-D7E9-4057-AF14-CA68AB066C0D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FA7FD4A8-D7E9-4057-AF14-CA68AB066C0D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FA7FD4A8-D7E9-4057-AF14-CA68AB066C0D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2DEDCFD-71EF-4C40-B596-2FE2E68D4475}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2DEDCFD-71EF-4C40-B596-2FE2E68D4475}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2DEDCFD-71EF-4C40-B596-2FE2E68D4475}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2DEDCFD-71EF-4C40-B596-2FE2E68D4475}.Release|Any CPU.Build.0 = Release|Any CPU
+		{43E7CC52-2935-4D00-8F7E-B2B5B6760D72}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{43E7CC52-2935-4D00-8F7E-B2B5B6760D72}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{43E7CC52-2935-4D00-8F7E-B2B5B6760D72}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{43E7CC52-2935-4D00-8F7E-B2B5B6760D72}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FA7FD4A8-D7E9-4057-AF14-CA68AB066C0D} = {0EF7F93D-746A-4E30-86A2-12A00FD7DCBC}
+		{F2DEDCFD-71EF-4C40-B596-2FE2E68D4475} = {0EF7F93D-746A-4E30-86A2-12A00FD7DCBC}
+		{43E7CC52-2935-4D00-8F7E-B2B5B6760D72} = {0EF7F93D-746A-4E30-86A2-12A00FD7DCBC}
+	EndGlobalSection
+EndGlobal

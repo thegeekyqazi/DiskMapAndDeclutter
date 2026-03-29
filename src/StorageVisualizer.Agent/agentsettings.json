@@ -1,0 +1,11 @@
+{
+  "PipeName": "storage-visualizer-agent-sawaa-diskmap",
+  "ClientToken": "local-dev-agent-token",
+  "AuditLogPath": "logs\\agent-audit.log",
+  "CurrentUserOnly": false,
+  "DestructiveOperationsEnabled": false,
+  "RunningAsService": false,
+  "AgentMode": "development",
+  "TransportMode": "Auto",
+  "LoopbackPort": 5091
+}

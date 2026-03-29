@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Visualizer</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f4f1ea;
+            --panel: rgba(255, 255, 255, 0.9);
+            --panel-border: rgba(51, 74, 61, 0.12);
+            --ink: #1b2f26;
+            --muted: #566a61;
+            --accent: #285943;
+            --accent-strong: #173a2f;
+            --danger: #8c2f39;
+            --warn: #9b6b18;
+            --shadow: 0 24px 70px rgba(27, 47, 38, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(95, 143, 118, 0.16), transparent 28%),
+                radial-gradient(circle at top right, rgba(184, 136, 79, 0.16), transparent 24%),
+                linear-gradient(180deg, #f7f4ee 0%, #ede7dd 100%);
+        }
+
+        main {
+            width: min(1240px, calc(100% - 32px));
+            margin: 32px auto;
+        }
+
+        .hero,
+        .panel,
+        .metric {
+            background: var(--panel);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--panel-border);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+        }
+
+        .hero {
+            padding: 28px;
+            margin-bottom: 20px;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(40, 89, 67, 0.1);
+            color: var(--accent-strong);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 16px 0 10px;
+            font-size: clamp(2rem, 4vw, 3.4rem);
+            line-height: 0.98;
+        }
+
+        .hero p,
+        .helper,
+        .subtle {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .hero p {
+            max-width: 860px;
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .panel {
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 14px;
+            align-items: end;
+        }
+
+        .field-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--accent-strong);
+        }
+
+        input[type="text"] {
+            width: 100%;
+            border: 1px solid rgba(27, 47, 38, 0.14);
+            border-radius: 16px;
+            padding: 16px 18px;
+            font-size: 1rem;
+            background: #fffdf9;
+            color: var(--ink);
+        }
+
+        input[type="text"]:focus {
+            outline: 2px solid rgba(40, 89, 67, 0.22);
+            border-color: rgba(40, 89, 67, 0.36);
+        }
+
+        button {
+            border: 0;
+            border-radius: 16px;
+            padding: 16px 22px;
+            min-width: 168px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            color: #fff;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+            transition: transform 120ms ease, opacity 120ms ease;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            cursor: wait;
+            opacity: 0.72;
+        }
+
+        .helper {
+            margin-top: 12px;
+            font-size: 0.95rem;
+        }
+
+        .status {
+            margin-top: 18px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            font-size: 0.95rem;
+        }
+
+        .status.info {
+            color: var(--accent-strong);
+            background: rgba(40, 89, 67, 0.1);
+        }
+
+        .status.error {
+            color: var(--danger);
+            background: rgba(140, 47, 57, 0.1);
+        }
+
+        .status.warn {
+            color: var(--warn);
+            background: rgba(155, 107, 24, 0.12);
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .metric {
+            padding: 18px;
+        }
+
+        .metric-label {
+            margin: 0 0 8px;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+
+        .metric-value {
+            margin: 0;
+            font-size: clamp(1.4rem, 3vw, 2.2rem);
+            font-weight: 700;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1.25fr 0.75fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .list {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        .list li + li {
+            margin-top: 10px;
+        }
+
+        .empty-note {
+            margin: 0;
+            color: var(--muted);
+        }
+
+        .meta-line {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(40, 89, 67, 0.1);
+            color: var(--accent-strong);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .pill.offline {
+            background: rgba(140, 47, 57, 0.12);
+            color: var(--danger);
+        }
+
+        .pill.warn {
+            background: rgba(155, 107, 24, 0.12);
+            color: var(--warn);
+        }
+
+        .recommendation-card {
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(40, 89, 67, 0.06);
+            border: 1px solid rgba(40, 89, 67, 0.1);
+        }
+
+        .recommendation-card + .recommendation-card {
+            margin-top: 14px;
+        }
+
+        .recommendation-title {
+            margin: 0 0 8px;
+            font-size: 1rem;
+            color: var(--accent-strong);
+        }
+
+        .recommendation-meta {
+            margin: 0 0 8px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .recommendation-filters {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin: 18px 0;
+        }
+
+        .recommendation-filters select,
+        .recommendation-filters input[type="search"] {
+            width: 100%;
+            border: 1px solid rgba(27, 47, 38, 0.14);
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            background: #fffdf9;
+            color: var(--ink);
+        }
+
+        .recommendation-summary {
+            margin: 0 0 12px;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .chart-shell {
+            min-height: 72vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #chart {
+            width: 100%;
+            height: 72vh;
+            min-height: 520px;
+        }
+
+        .overlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(244, 241, 234, 0.72);
+            z-index: 1;
+        }
+
+        .overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: 5px solid rgba(40, 89, 67, 0.14);
+            border-top-color: var(--accent);
+            animation: spin 0.9s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .metrics {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 720px) {
+            main {
+                width: min(100% - 20px, 100%);
+                margin: 16px auto;
+            }
+
+            .hero,
+            .panel,
+            .metric {
+                border-radius: 20px;
+                padding: 18px;
+            }
+
+            .controls,
+            .metrics,
+            .recommendation-filters {
+                grid-template-columns: 1fr;
+            }
+
+            button {
+                width: 100%;
+            }
+
+            #chart {
+                min-height: 420px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <section class="hero">
+        <div class="eyebrow">Read-only local scanner</div>
+        <h1>Map folders with context, not just size.</h1>
+        <p>
+            This phase adds richer scan metadata: installed-program path detection from the Windows uninstall registry,
+            bounded best-effort lock checks, and warnings for reparse points and unreadable folders. The app still does not delete,
+            move, elevate, or modify anything.
+        </p>
+    </section>
+
+    <section class="panel">
+        <div class="controls">
+            <div>
+                <label class="field-label" for="targetPath">Target directory</label>
+                <input id="targetPath" type="text" placeholder="C:\\Users\\YourName\\Downloads" />
+            </div>
+            <button id="scanButton" type="button">Scan folder</button>
+        </div>
+
+        <div class="helper">
+            Protected folders are detected by matching scan paths against installed-application locations in the Windows uninstall registry.
+            Lock checks are best-effort and capped to avoid turning a scan into a stress test.
+            The privileged boundary prefers a local named pipe and falls back to loopback-only TCP in this dev phase if the machine denies pipe connections.
+        </div>
+
+        <div id="status" class="status info">Enter a folder path and run a read-only scan.</div>
+        <div class="meta-line">
+            <span class="pill" id="rootPathPill">No scan yet</span>
+            <span class="pill" id="scanTimePill">Waiting</span>
+            <span class="pill offline" id="agentStatusPill">Agent offline</span>
+        </div>
+    </section>
+
+    <section class="metrics">
+        <article class="metric">
+            <p class="metric-label">Displayed folders</p>
+            <p class="metric-value" id="displayedNodesValue">0</p>
+        </article>
+        <article class="metric">
+            <p class="metric-label">Protected folders</p>
+            <p class="metric-value" id="protectedNodesValue">0</p>
+        </article>
+        <article class="metric">
+            <p class="metric-label">Suspected locked files</p>
+            <p class="metric-value" id="lockedFilesValue">0</p>
+        </article>
+        <article class="metric">
+            <p class="metric-label">Access / reparse issues</p>
+            <p class="metric-value" id="issueCountValue">0</p>
+        </article>
+    </section>
+
+    <section class="panel detail-grid">
+        <div>
+            <h2>Warnings</h2>
+            <ul id="warningsList" class="list"></ul>
+            <p id="warningsEmpty" class="empty-note">No scan warnings yet.</p>
+        </div>
+        <div>
+            <h2>Privileged boundary</h2>
+            <ul id="agentFactsList" class="list">
+                <li>Agent status: offline</li>
+                <li>Transport: named pipe preferred, loopback fallback enabled</li>
+                <li>Auth model: shared token in this dev phase</li>
+                <li>Destructive commands: denied in this phase</li>
+            </ul>
+        </div>
+        <div>
+            <h2>Scan facts</h2>
+            <ul id="factsList" class="list">
+                <li>Files seen: 0</li>
+                <li>Directories seen: 0</li>
+                <li>Installed program locations loaded: 0</li>
+                <li>Lock checks performed: 0</li>
+            </ul>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>Read-only recommendations</h2>
+        <p class="subtle">
+            These are review suggestions only. Nothing here is deleted, moved, or queued automatically.
+        </p>
+        <div class="recommendation-filters">
+            <div>
+                <label class="field-label" for="recommendationCategoryFilter">Category</label>
+                <select id="recommendationCategoryFilter">
+                    <option value="all">All categories</option>
+                </select>
+            </div>
+            <div>
+                <label class="field-label" for="recommendationPriorityFilter">Priority</label>
+                <select id="recommendationPriorityFilter">
+                    <option value="all">All priorities</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="review">Review</option>
+                </select>
+            </div>
+            <div>
+                <label class="field-label" for="recommendationSizeFilter">Minimum size</label>
+                <select id="recommendationSizeFilter">
+                    <option value="0">Any size</option>
+                    <option value="134217728">128 MB+</option>
+                    <option value="268435456">256 MB+</option>
+                    <option value="536870912">512 MB+</option>
+                    <option value="1073741824">1 GB+</option>
+                </select>
+            </div>
+            <div>
+                <label class="field-label" for="recommendationSort">Sort</label>
+                <select id="recommendationSort">
+                    <option value="priority">Priority then size</option>
+                    <option value="size">Largest first</option>
+                    <option value="category">Category</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <label class="field-label" for="recommendationSearch">Search</label>
+            <input id="recommendationSearch" type="search" placeholder="Filter by folder name, path, or reason" />
+        </div>
+        <p id="recommendationSummary" class="recommendation-summary">No recommendation candidates yet.</p>
+        <div id="recommendationsList"></div>
+        <p id="recommendationsEmpty" class="empty-note">No recommendation candidates yet.</p>
+    </section>
+
+    <section class="panel chart-shell">
+        <div id="overlay" class="overlay" aria-hidden="true">
+            <div class="spinner" aria-label="Scanning"></div>
+        </div>
+        <div id="chart"></div>
+    </section>
+</main>
+
+<script>
+    const targetPathInput = document.getElementById("targetPath");
+    const scanButton = document.getElementById("scanButton");
+    const overlay = document.getElementById("overlay");
+    const statusBox = document.getElementById("status");
+    const chartDiv = document.getElementById("chart");
+    const rootPathPill = document.getElementById("rootPathPill");
+    const scanTimePill = document.getElementById("scanTimePill");
+    const displayedNodesValue = document.getElementById("displayedNodesValue");
+    const protectedNodesValue = document.getElementById("protectedNodesValue");
+    const lockedFilesValue = document.getElementById("lockedFilesValue");
+    const issueCountValue = document.getElementById("issueCountValue");
+    const agentStatusPill = document.getElementById("agentStatusPill");
+    const agentFactsList = document.getElementById("agentFactsList");
+    const warningsList = document.getElementById("warningsList");
+    const warningsEmpty = document.getElementById("warningsEmpty");
+    const factsList = document.getElementById("factsList");
+    const recommendationsList = document.getElementById("recommendationsList");
+    const recommendationsEmpty = document.getElementById("recommendationsEmpty");
+    const recommendationCategoryFilter = document.getElementById("recommendationCategoryFilter");
+    const recommendationPriorityFilter = document.getElementById("recommendationPriorityFilter");
+    const recommendationSizeFilter = document.getElementById("recommendationSizeFilter");
+    const recommendationSort = document.getElementById("recommendationSort");
+    const recommendationSearch = document.getElementById("recommendationSearch");
+    const recommendationSummary = document.getElementById("recommendationSummary");
+    let latestRecommendations = [];
+
+    const setStatus = (message, kind = "info") => {
+        statusBox.textContent = message;
+        statusBox.className = `status ${kind}`;
+    };
+
+    const formatTimestamp = (value) => {
+        if (!value) {
+            return "Waiting";
+        }
+
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return "Unknown";
+        }
+
+        return date.toLocaleString();
+    };
+
+    const formatBytes = (value) => {
+        const bytes = Number(value || 0);
+        if (bytes >= 1073741824) {
+            return `${(bytes / 1073741824).toFixed(2)} GB`;
+        }
+
+        if (bytes >= 1048576) {
+            return `${(bytes / 1048576).toFixed(1)} MB`;
+        }
+
+        if (bytes >= 1024) {
+            return `${(bytes / 1024).toFixed(1)} KB`;
+        }
+
+        return `${bytes} bytes`;
+    };
+
+    const renderSummary = (summary) => {
+        rootPathPill.textContent = summary.rootPath || "Unknown root";
+        scanTimePill.textContent = `Scanned ${formatTimestamp(summary.scannedAtUtc)}`;
+        displayedNodesValue.textContent = summary.displayedNodeCount ?? 0;
+        protectedNodesValue.textContent = summary.protectedNodeCount ?? 0;
+        lockedFilesValue.textContent = summary.suspectedLockedFileCount ?? 0;
+        issueCountValue.textContent = (summary.accessIssueCount ?? 0) + (summary.reparsePointSkipCount ?? 0);
+
+        const warnings = summary.warnings || [];
+        warningsList.innerHTML = "";
+        warningsEmpty.style.display = warnings.length ? "none" : "block";
+        warnings.forEach((warning) => {
+            const item = document.createElement("li");
+            item.textContent = warning;
+            warningsList.appendChild(item);
+        });
+
+        factsList.innerHTML = "";
+        [
+            `Files seen: ${summary.totalFilesSeen ?? 0}`,
+            `Directories seen: ${summary.totalDirectoriesSeen ?? 0}`,
+            `Installed program locations loaded: ${summary.installedProgramLocationCount ?? 0}`,
+            `Lock checks performed: ${summary.lockChecksPerformed ?? 0}`,
+            `Recommendation candidates: ${summary.recommendationCount ?? 0}`,
+            `Skipped directories by rule: ${summary.skippedDirectoryCount ?? 0}`,
+            `Reparse points skipped: ${summary.reparsePointSkipCount ?? 0}`,
+            `Unreadable items: ${summary.accessIssueCount ?? 0}`
+        ].forEach((fact) => {
+            const item = document.createElement("li");
+            item.textContent = fact;
+            factsList.appendChild(item);
+        });
+    };
+
+    const priorityScore = (value) => {
+        if (value === "high") {
+            return 3;
+        }
+
+        if (value === "medium") {
+            return 2;
+        }
+
+        return 1;
+    };
+
+    const hydrateRecommendationFilters = (recommendations) => {
+        const categories = [...new Set((recommendations || []).map((item) => item.category).filter(Boolean))].sort();
+        const previousValue = recommendationCategoryFilter.value;
+        recommendationCategoryFilter.innerHTML = '<option value="all">All categories</option>';
+
+        categories.forEach((category) => {
+            const option = document.createElement("option");
+            option.value = category;
+            option.textContent = category;
+            recommendationCategoryFilter.appendChild(option);
+        });
+
+        recommendationCategoryFilter.value = categories.includes(previousValue) ? previousValue : "all";
+    };
+
+    const applyRecommendationFilters = (recommendations) => {
+        const category = recommendationCategoryFilter.value;
+        const priority = recommendationPriorityFilter.value;
+        const minimumSize = Number(recommendationSizeFilter.value || 0);
+        const query = recommendationSearch.value.trim().toLowerCase();
+        const sortMode = recommendationSort.value;
+
+        const filtered = (recommendations || []).filter((item) => {
+            if (category !== "all" && item.category !== category) {
+                return false;
+            }
+
+            if (priority !== "all" && item.priority !== priority) {
+                return false;
+            }
+
+            if ((item.estimatedBytes || 0) < minimumSize) {
+                return false;
+            }
+
+            if (!query) {
+                return true;
+            }
+
+            const haystack = [
+                item.title,
+                item.path,
+                item.reason,
+                item.category,
+                ...(item.signals || [])
+            ].join(" ").toLowerCase();
+
+            return haystack.includes(query);
+        });
+
+        filtered.sort((left, right) => {
+            if (sortMode === "size") {
+                return (right.estimatedBytes || 0) - (left.estimatedBytes || 0);
+            }
+
+            if (sortMode === "category") {
+                return `${left.category}`.localeCompare(`${right.category}`) ||
+                    (right.estimatedBytes || 0) - (left.estimatedBytes || 0);
+            }
+
+            return priorityScore(right.priority) - priorityScore(left.priority) ||
+                (right.estimatedBytes || 0) - (left.estimatedBytes || 0);
+        });
+
+        return filtered;
+    };
+
+    const renderRecommendations = (recommendations) => {
+        latestRecommendations = recommendations || [];
+        hydrateRecommendationFilters(latestRecommendations);
+        const items = applyRecommendationFilters(latestRecommendations);
+        recommendationsList.innerHTML = "";
+        recommendationsEmpty.style.display = items.length ? "none" : "block";
+        recommendationSummary.textContent = items.length
+            ? `Showing ${items.length} of ${latestRecommendations.length} review candidates.`
+            : latestRecommendations.length
+                ? "No review candidates match the current filters."
+                : "No recommendation candidates yet.";
+
+        items.forEach((recommendation) => {
+            const card = document.createElement("article");
+            card.className = "recommendation-card";
+
+            const title = document.createElement("h3");
+            title.className = "recommendation-title";
+            title.textContent = recommendation.title || "Review candidate";
+            card.appendChild(title);
+
+            const meta = document.createElement("p");
+            meta.className = "recommendation-meta";
+            meta.textContent = `${recommendation.category || "Unknown"} | ${recommendation.priority || "review"} | ${formatBytes(recommendation.estimatedBytes ?? 0)}`;
+            card.appendChild(meta);
+
+            const path = document.createElement("p");
+            path.className = "recommendation-meta";
+            path.textContent = recommendation.path || "";
+            card.appendChild(path);
+
+            const reason = document.createElement("p");
+            reason.textContent = recommendation.reason || "";
+            card.appendChild(reason);
+
+            const signals = document.createElement("ul");
+            signals.className = "list";
+            (recommendation.signals || []).forEach((signal) => {
+                const item = document.createElement("li");
+                item.textContent = signal;
+                signals.appendChild(item);
+            });
+
+            card.appendChild(signals);
+            recommendationsList.appendChild(card);
+        });
+    };
+
+    const renderChart = (payload) => {
+        const customData = (payload.nodeDetails || []).map((detail) => ([
+            detail.isProtected ? "Yes" : "No",
+            detail.protectionReason || "None",
+            detail.suspectedLockedFileCount ?? 0,
+            detail.accessIssueCount ?? 0,
+            detail.reparsePointSkipCount ?? 0,
+            detail.skippedDirectoryCount ?? 0,
+            detail.directFileCount ?? 0,
+            detail.directChildDirectoryCount ?? 0,
+            detail.directArchiveFileCount ?? 0,
+            detail.directInstallerFileCount ?? 0,
+            detail.directLogFileCount ?? 0,
+            detail.largeDirectFileCount ?? 0,
+            detail.latestContentWriteUtc ? formatTimestamp(detail.latestContentWriteUtc) : "Unknown"
+        ]));
+
+        const trace = [{
+            type: "sunburst",
+            ids: payload.ids,
+            labels: payload.labels,
+            parents: payload.parents,
+            values: payload.values,
+            customdata: customData,
+            branchvalues: "total",
+            maxdepth: 3,
+            textinfo: "label+value+percent parent",
+            hovertemplate:
+                "<b>%{label}</b><br>" +
+                "Size: %{value} bytes<br>" +
+                "Protected: %{customdata[0]}<br>" +
+                "Protection reason: %{customdata[1]}<br>" +
+                "Suspected locked files: %{customdata[2]}<br>" +
+                "Access issues: %{customdata[3]}<br>" +
+                "Reparse skips: %{customdata[4]}<br>" +
+                "Rule-based skipped dirs: %{customdata[5]}<br>" +
+                "Direct files: %{customdata[6]}<br>" +
+                "Direct child dirs: %{customdata[7]}<br>" +
+                "Archive files: %{customdata[8]}<br>" +
+                "Installer files: %{customdata[9]}<br>" +
+                "Log files: %{customdata[10]}<br>" +
+                "Large direct files: %{customdata[11]}<br>" +
+                "Latest content write: %{customdata[12]}<extra></extra>",
+            marker: {
+                line: {
+                    width: 1,
+                    color: "#fffdf9"
+                }
+            }
+        }];
+
+        const layout = {
+            margin: { l: 0, r: 0, b: 0, t: 0 },
+            paper_bgcolor: "rgba(0,0,0,0)",
+            plot_bgcolor: "rgba(0,0,0,0)",
+            sunburstcolorway: ["#285943", "#b8884f", "#406c8d", "#9c5c3f", "#607d5a", "#5f4b8b"]
+        };
+
+        Plotly.newPlot(chartDiv, trace, layout, { responsive: true });
+    };
+
+    const renderAgentStatus = (payload) => {
+        const isReachable = !!payload?.isReachable;
+        const status = payload?.status || {};
+
+        agentStatusPill.textContent = isReachable
+            ? `Agent online: ${status.agentMode || "unknown"}`
+            : (payload?.message || "Agent offline");
+        agentStatusPill.className = `pill ${isReachable ? "warn" : "offline"}`;
+
+        agentFactsList.innerHTML = "";
+        [
+            `Agent status: ${isReachable ? "online" : "offline"}`,
+            `Pipe name: ${status.pipeName || "storage-visualizer-agent"}`,
+            `Transport used: ${payload?.transport || "unavailable"}`,
+            `Transport policy: ${payload?.configuredTransportMode || status.transportMode || "Auto"}`,
+            `Enabled transports: ${(status.enabledTransports || []).join(", ") || "none"}`,
+            `Auth model: ${status.currentUserOnly ? "current-user-only" : "shared token (dev phase)"}`,
+            `Destructive commands enabled: ${status.destructiveOperationsEnabled ? "yes" : "no"}`,
+            `Running as service: ${status.runningAsService ? "yes" : "no"}`,
+            `Audit log path: ${status.auditLogPath || "unavailable"}`,
+            `Allowed commands: ${(status.allowedCommands || []).join(", ") || "none"}`
+        ].forEach((fact) => {
+            const item = document.createElement("li");
+            item.textContent = fact;
+            agentFactsList.appendChild(item);
+        });
+    };
+
+    const refreshAgentStatus = async () => {
+        try {
+            const response = await fetch("/api/agent/status");
+            const body = await response.json().catch(() => ({}));
+            renderAgentStatus(body);
+        } catch {
+            renderAgentStatus({ isReachable: false, message: "Agent offline" });
+        }
+    };
+
+    scanButton.addEventListener("click", async () => {
+        const targetPath = targetPathInput.value.trim();
+        if (!targetPath) {
+            setStatus("Provide a directory path before scanning.", "error");
+            return;
+        }
+
+        localStorage.setItem("storage-visualizer:last-path", targetPath);
+        scanButton.disabled = true;
+        overlay.classList.add("active");
+        Plotly.purge(chartDiv);
+        setStatus("Scanning in read-only mode with metadata collection...", "info");
+
+        try {
+            const response = await fetch(`/api/scan?targetPath=${encodeURIComponent(targetPath)}`);
+            const body = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(body.detail || body.title || "Scan failed.");
+            }
+
+            renderSummary(body.summary || {});
+            renderRecommendations(body.recommendations || []);
+            renderChart(body);
+            await refreshAgentStatus();
+
+            if ((body.summary?.warnings || []).length > 0) {
+                setStatus("Scan complete. Review warnings before treating anything as safe to remove.", "warn");
+            } else {
+                setStatus("Scan complete. No warnings were raised for the displayed nodes.", "info");
+            }
+        } catch (error) {
+            setStatus(error.message, "error");
+        } finally {
+            overlay.classList.remove("active");
+            scanButton.disabled = false;
+        }
+    });
+
+    const savedPath = localStorage.getItem("storage-visualizer:last-path");
+    if (savedPath) {
+        targetPathInput.value = savedPath;
+    }
+
+    recommendationCategoryFilter.addEventListener("change", () => renderRecommendations(latestRecommendations));
+    recommendationPriorityFilter.addEventListener("change", () => renderRecommendations(latestRecommendations));
+    recommendationSizeFilter.addEventListener("change", () => renderRecommendations(latestRecommendations));
+    recommendationSort.addEventListener("change", () => renderRecommendations(latestRecommendations));
+    recommendationSearch.addEventListener("input", () => renderRecommendations(latestRecommendations));
+
+    refreshAgentStatus();
+</script>
+</body>
+</html>
