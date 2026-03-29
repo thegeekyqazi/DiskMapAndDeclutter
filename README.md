@@ -1,4 +1,4 @@
-# 🚀 System Declutter Master (DiskMap & Declutter)
+# 🚀 DeepDrive
 
 A blazing-fast, cross-platform system utility designed to map storage, mathematically prove file duplication, and safely hunt down orphaned Windows system cache without accidental deletions. 
 
@@ -51,8 +51,8 @@ Because the core engines rely heavily on Python's standard library, the dependen
 
 **1. Clone the repository**
 ```bash
-git clone [https://github.com/thegeekyqazi/DiskMapAndDeclutter.git](https://github.com/thegeekyqazi/DiskMapAndDeclutter.git)
-cd DiskMapAndDeclutter
+git clone [https://github.com/thegeekyqazi/DeepDrive.git](https://github.com/thegeekyqazi/DeepDrive.git)
+cd DeepDrive
 ```
 
 **2. Install the API requirements**
@@ -66,7 +66,7 @@ uvicorn server:app --reload
 ```
 
 **4. Launch the UI**
-Simply open `index.html` in any modern web browser.
+Simply open `index.html` in any modern web browser. No frontend build steps (npm/webpack) required!
 
 ---
 

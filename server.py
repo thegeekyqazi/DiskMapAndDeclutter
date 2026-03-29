@@ -9,8 +9,7 @@ from deduplicator import find_duplicates, delete_selected_files
 
 from TempEngine import scan_temp_space, flush_temp_files
 from GhostHunter import find_ghost_folders, delete_ghost_folders
-
-app = FastAPI(title="System Declutter Master API")
+app = FastAPI(title="DeepDrive API")
 
 # Allow the frontend to communicate with this server
 app.add_middleware(
