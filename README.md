@@ -1,6 +1,6 @@
 # 🚀 DeepDrive
 
-A blazing-fast, cross-platform system utility designed to map storage, mathematically prove file duplication, and safely hunt down orphaned Windows system cache without accidental deletions. 
+A blazing-fast system utility designed to map storage, mathematically prove file duplication, safely hunt down orphaned Windows system cache, and surgically debloat your OS. 
 
 Built with a lightweight **Python/FastAPI** backend and a premium, responsive **Vanilla JS/CSS** frontend.
 
@@ -18,27 +18,35 @@ Scanning thousands of files for duplicates can take hours. We built a highly opt
 * **Stage 1 (O(1) Size Grouping):** Instantly filters out unique files by grouping them by exact byte size. Ignores files under 1MB to optimize NTFS file system reads.
 * **Stage 2 (4KB Fast-Hash):** Reads only the first 4,096 bytes (the header) of surviving files and runs an MD5 hash. If the headers differ, they are discarded.
 * **Stage 3 (SHA-256 Cryptographic Hash):** Streams the remaining files in 64KB chunks to prevent RAM overflow and generates a full SHA-256 cryptographic signature. 
-* **Result:** 100% mathematical certainty that files are identical before presenting them for deletion.
 
-### 3. 👻 Windows Deep Clean (Ghost Hunter & Temp Flusher)
-Uninstallers notoriously leave massive cache folders behind in `C:\Users\<User>\AppData`. 
-* **Registry Interrogation:** The backend scrapes the Windows Registry (`winreg`) to build a master list of currently installed software and publishers.
-* **Fuzzy Logic Matching:** Uses `difflib` (Ratcliff/Obershelp algorithm) to bi-directionally compare orphaned `AppData` folder names against the active Registry list.
+### 3. 👻 Windows Deep Clean
+* **Ghost Hunter:** Scrapes the Windows Registry (`winreg`) and uses fuzzy string matching (`difflib`) to bi-directionally compare installed software against `AppData` folders, finding invisible orphaned data left behind by uninstalled apps.
 * **Temp Cache Flusher:** Safely and aggressively wipes `AppData\Local\Temp` and `Windows\Temp`, gracefully skipping files currently locked by the OS.
+
+### 4. 🛡️ OS Debloater & Privacy Shield
+Inspired by the legendary CTT WinUtil project, this module safely removes pre-installed Windows bloat without breaking the OS.
+* **AppxPackage Purge:** Uses background PowerShell commands to cross-reference installed apps against a highly curated, 40+ item whitelist of known OEM junk (Candy Crush, Xbox Overlays, etc.) and uninstalls them securely.
+* **Telemetry Blocker:** Applies direct Windows Registry tweaks to disable Microsoft Telemetry and background data collection.
+
+### 5. 📡 File Radar
+The ultimate psychological decluttering tool.
+* **Space Hogs:** Instantly surfaces the 50 absolute largest files in any target directory.
+* **Time Machine (Stale Files):** Hunts down massive files (>50MB) that haven't been accessed or modified in over 365 days.
 
 ---
 
-## 🛡️ Safety & Guardrails
-Deleting files is dangerous. This app is built with extreme safety constraints:
-* **Dynamic OS Detection:** Automatically blocks scanning of critical system paths like `C:\Windows` or Linux `/boot`.
-* **AppData Whitelists:** Hardcoded safeguards prevent the Ghost Hunter from flagging critical Windows folders (e.g., `Microsoft`, `Packages`, `Comms`).
-* **Frontend Batch Rendering:** Instead of freezing the browser by injecting thousands of DOM elements iteratively, the UI builds a single payload and renders it in O(1) time.
+## 🔒 Safety & Guardrails
+Deleting files and altering the registry is dangerous. DeepDrive is built with extreme safety constraints:
+* **Native UAC Elevation:** Automatically triggers the native Windows Administrator prompt on boot to ensure registry tweaks are handled securely.
+* **AppData Whitelists:** Hardcoded safeguards prevent the Ghost Hunter from flagging critical Windows folders.
+* **Frontend Batch Rendering:** Instead of freezing the browser by injecting thousands of DOM elements iteratively, the UI compiles a single massive HTML string in the background and renders it in O(1) time.
 
 ---
 
 ## 🛠️ Tech Stack
 * **Backend:** Python 3.8+, FastAPI, Uvicorn
-* **Algorithms:** `hashlib` (Cryptography), `difflib` (Fuzzy String Matching), `winreg` (Windows API)
+* **OS Interfacing:** `ctypes`, `winreg`, `subprocess` (PowerShell)
+* **Algorithms:** `hashlib` (Cryptography), `difflib` (Fuzzy String Matching)
 * **Frontend:** Vanilla HTML5, CSS3, JavaScript (ES6+)
 * **Data Visualization:** Plotly.js
 * **Icons:** Google Material Icons
@@ -47,7 +55,7 @@ Deleting files is dangerous. This app is built with extreme safety constraints:
 
 ## 🚀 Quickstart Installation
 
-Because the core engines rely heavily on Python's standard library, the dependency footprint is incredibly small.
+Because the core engines rely entirely on Python's standard library, the dependency footprint is incredibly small.
 
 **1. Clone the repository**
 ```bash
@@ -60,22 +68,20 @@ cd DeepDrive
 pip install fastapi uvicorn pydantic
 ```
 
-**3. Boot the backend server**
+**3. Boot the application**
 ```bash
-uvicorn server:app --reload
+python server.py
 ```
-
-**4. Launch the UI**
-Simply open `index.html` in any modern web browser. No frontend build steps (npm/webpack) required!
+*Note: DeepDrive will automatically prompt you for Windows Administrator privileges (UAC), start the local server, and open the UI in your default web browser!*
 
 ---
 
 ## 🔮 Future Roadmap
-* **Top 50 Space Hogs:** A radar feature to instantly flag the largest single files on the drive.
-* **Stale File Detection:** Flagging files that haven't been modified or accessed in over 365 days.
-* **Recycle Bin Integration:** Routing deleted files to the OS Recycle Bin (`send2trash`) instead of permanent vaporization for an ultimate "Undo" failsafe.
+* **Perceptual Image Hashing:** Finding duplicate photos that look identical even if their resolutions or file types differ.
+* **Linux Port:** A `LinuxEngine.py` module to target `~/.cache`, Systemd Journals, and orphaned package dotfiles via `apt` and `pacman`.
+* **Context Menu Integration:** Adding DeepDrive to the native Windows right-click menu.
 
 ---
 
 ### ⚠️ Disclaimer
-*This tool is designed to permanently delete files and directories. While strict safety guardrails are implemented, users should always review flagged duplicates and AppData Ghost folders carefully before executing a deletion. Use at your own risk.*
+*This tool is designed to permanently delete files, directories, and AppxPackages. While strict safety guardrails are implemented, users should always review flagged duplicates and flagged AppData folders carefully before executing a deletion. Use at your own risk.*
