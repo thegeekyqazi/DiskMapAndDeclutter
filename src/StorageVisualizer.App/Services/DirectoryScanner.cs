@@ -10,15 +10,18 @@ public sealed class DirectoryScanner
     private readonly HashSet<string> _skippedDirectoryNames;
     private readonly HashSet<string> _archiveExtensions;
     private readonly HashSet<string> _installerExtensions;
+    private readonly ScanPathGuard _pathGuard;
     private readonly InstalledProgramCatalog _installedProgramCatalog;
     private readonly FileLockInspector _fileLockInspector;
 
     public DirectoryScanner(
         IOptions<StorageScanOptions> options,
+        ScanPathGuard pathGuard,
         InstalledProgramCatalog installedProgramCatalog,
         FileLockInspector fileLockInspector)
     {
         _options = options.Value;
+        _pathGuard = pathGuard;
         _installedProgramCatalog = installedProgramCatalog;
         _fileLockInspector = fileLockInspector;
         _skippedDirectoryNames = new HashSet<string>(
@@ -34,20 +37,11 @@ public sealed class DirectoryScanner
 
     public StorageScanResult BuildStorageTree(string rootPath)
     {
-        var normalizedPath = Path.GetFullPath(rootPath.Trim());
-        var rootDirectory = new DirectoryInfo(normalizedPath);
-
-        if (!rootDirectory.Exists)
-        {
-            throw new DirectoryNotFoundException(
-                $"The directory '{normalizedPath}' does not exist.");
-        }
-
-        EnsureSafeTarget(rootDirectory);
+        var rootDirectory = _pathGuard.GetValidatedRootDirectory(rootPath);
 
         var summary = new ScanSummary
         {
-            RootPath = normalizedPath,
+            RootPath = rootDirectory.FullName,
             ScannedAtUtc = DateTimeOffset.UtcNow,
             InstalledProgramLocationCount = _installedProgramCatalog.GetLocations().Count
         };
@@ -245,53 +239,6 @@ public sealed class DirectoryScanner
                 $"{summary.ReparsePointSkipCount} reparse points were skipped to avoid following symlinks or junctions.");
         }
     }
-
-    private void EnsureSafeTarget(DirectoryInfo directory)
-    {
-        if (IsReparsePoint(directory))
-        {
-            throw new ScanSafetyException(
-                "Scanning a reparse-point root is blocked. Pick a normal directory instead.");
-        }
-
-        if (OperatingSystem.IsWindows())
-        {
-            foreach (var blockedPrefix in GetBlockedWindowsPrefixes())
-            {
-                if (IsWithinPath(directory.FullName, blockedPrefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new ScanSafetyException(
-                        $"Scanning '{blockedPrefix}' is blocked by the safety guardrail.");
-                }
-            }
-        }
-
-        if (OperatingSystem.IsLinux() &&
-            (directory.FullName == "/" ||
-             IsWithinPath(directory.FullName, "/boot", StringComparison.Ordinal)))
-        {
-            throw new ScanSafetyException(
-                "Scanning '/' and '/boot' is blocked by the safety guardrail.");
-        }
-    }
-
-    private IEnumerable<string> GetBlockedWindowsPrefixes()
-    {
-        foreach (var configuredPrefix in _options.BlockedPathPrefixes)
-        {
-            if (!string.IsNullOrWhiteSpace(configuredPrefix))
-            {
-                yield return Path.GetFullPath(configuredPrefix);
-            }
-        }
-
-        var windowsDirectory = Environment.GetEnvironmentVariable("WINDIR");
-        if (!string.IsNullOrWhiteSpace(windowsDirectory))
-        {
-            yield return Path.GetFullPath(windowsDirectory);
-        }
-    }
-
     private static bool IsReparsePoint(FileSystemInfo entry)
     {
         return entry.Attributes.HasFlag(FileAttributes.ReparsePoint);
@@ -302,22 +249,6 @@ public sealed class DirectoryScanner
         return string.IsNullOrWhiteSpace(directory.Name)
             ? directory.FullName
             : directory.Name;
-    }
-
-    private static bool IsWithinPath(string candidatePath, string blockedPath, StringComparison comparison)
-    {
-        var normalizedCandidate = NormalizePath(candidatePath);
-        var normalizedBlocked = NormalizePath(blockedPath);
-
-        return normalizedCandidate.Equals(normalizedBlocked, comparison) ||
-               normalizedCandidate.StartsWith(
-                   normalizedBlocked + Path.DirectorySeparatorChar,
-                   comparison);
-    }
-
-    private static string NormalizePath(string path)
-    {
-        return Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
     }
 
     private sealed class ScanContext

@@ -22,6 +22,30 @@ public sealed class StorageScanOptions
 
     public int StaleFolderDays { get; init; } = 180;
 
+    public int StaleFileDays { get; init; } = 180;
+
+    public long StaleFileMinimumBytes { get; init; } = 5_242_880;
+
+    public int MaxStaleFiles { get; init; } = 40;
+
+    public long DuplicateMinimumBytes { get; init; } = 1_048_576;
+
+    public int DuplicateHashBytes { get; init; } = 131_072;
+
+    public int MaxDuplicateCandidateFiles { get; init; } = 2000;
+
+    public int MaxDuplicateGroups { get; init; } = 20;
+
+    public int MaxDuplicateFilesPerGroup { get; init; } = 8;
+
+    public int InspectionPreviewLineLimit { get; init; } = 20;
+
+    public int InspectionZipEntryLimit { get; init; } = 24;
+
+    public int InspectionHexByteCount { get; init; } = 64;
+
+    public int MaxInspectionPreviewBytes { get; init; } = 131_072;
+
     public string[] SkippedDirectoryNames { get; init; } =
     [
         ".git",
@@ -57,6 +81,36 @@ public sealed class StorageScanOptions
         ".msix",
         ".appx",
         ".pkg"
+    ];
+
+    public string[] TextPreviewExtensions { get; init; } =
+    [
+        ".txt",
+        ".md",
+        ".log",
+        ".json",
+        ".jsonl",
+        ".xml",
+        ".csv",
+        ".tsv",
+        ".yml",
+        ".yaml",
+        ".ini",
+        ".config",
+        ".toml",
+        ".ps1",
+        ".bat",
+        ".cmd",
+        ".cs",
+        ".py",
+        ".js",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".html",
+        ".css",
+        ".scss",
+        ".sql"
     ];
 
     public string[] BlockedPathPrefixes { get; init; } =
