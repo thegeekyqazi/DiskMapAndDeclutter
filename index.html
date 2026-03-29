@@ -85,8 +85,8 @@
         .pill.danger { background: #f7e8eb; color: var(--danger); }
 
         /* Tab Navigation */
-        .tab-nav { display: flex; gap: 12px; margin-bottom: 24px; background: var(--panel); padding: 8px; border-radius: 18px; box-shadow: var(--shadow); }
-        .tab-btn { flex: 1; background: transparent; color: var(--muted); box-shadow: none; justify-content: center; }
+        .tab-nav { display: flex; gap: 12px; margin-bottom: 24px; background: var(--panel); padding: 8px; border-radius: 18px; box-shadow: var(--shadow); flex-wrap: wrap; }
+        .tab-btn { flex: 1; background: transparent; color: var(--muted); box-shadow: none; justify-content: center; min-width: 150px; }
         .tab-btn.active { background: #e6f1ea; color: var(--accent); }
         .tab-content { display: none; }
         .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
@@ -101,7 +101,7 @@
         .list-row:last-child { border-bottom: none; }
         
         /* Checkboxes */
-        input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--danger); cursor: pointer; }
+        input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--danger); cursor: pointer; flex-shrink: 0; }
 
         .loader { display: none; text-align: center; padding: 40px; color: var(--accent); font-weight: bold; }
     </style>
@@ -113,7 +113,7 @@
         <div>
             <div class="pill">DeepDrive</div>
             <h1>Map the mess.<br>Reclaim your space.</h1>
-            <p class="muted">A safe analysis workspace. Map your storage, mathematically prove duplicates, and hunt down orphaned Windows system cache without accidental deletions.</p>
+            <p class="muted">A safe analysis workspace. Map your storage, mathematically prove duplicates, hunt down orphaned Windows system cache, and debloat your OS securely.</p>
         </div>
         <div class="metrics">
             <article class="metric"><p class="k">Wasted Space Found</p><p class="v" id="stat-wasted">0 B</p></article>
@@ -134,6 +134,8 @@
         <button class="tab-btn active" data-target="tab-mapper"><i class="material-icons">pie_chart</i> Visual Mapper</button>
         <button class="tab-btn" data-target="tab-dedup"><i class="material-icons">file_copy</i> Smart Deduplicator</button>
         <button class="tab-btn" data-target="tab-windows"><i class="material-icons">memory</i> Windows Deep Clean</button>
+        <button class="tab-btn" data-target="tab-debloat"><i class="material-icons">security</i> OS Debloater</button>
+        <button class="tab-btn" data-target="tab-radar"><i class="material-icons">manage_search</i> File Radar</button>
     </nav>
 
     <div id="tab-mapper" class="tab-content active">
@@ -203,6 +205,80 @@
 
                 <div id="deleteGhostsRow" style="display: none; margin-top: 24px; text-align: right; padding-top: 20px; border-top: 1px solid var(--border);">
                     <button id="executeGhostDeleteBtn" class="danger"><i class="material-icons">delete_forever</i> Delete Selected Ghosts</button>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div id="tab-debloat" class="tab-content">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px;">
+            
+            <section class="panel" style="border-top: 4px solid #1976d2;">
+                <h2>Privacy Shield</h2>
+                <p class="muted">Inspired by CTT WinUtil. Applies registry tweaks to disable Microsoft Telemetry and background data collection.</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <i class="material-icons" style="font-size: 64px; color: #1976d2; margin-bottom: 10px;">verified_user</i>
+                    <br>
+                    <button id="telemetryBtn" style="background: linear-gradient(135deg, #1976d2, #0d47a1);">Apply Privacy Tweaks</button>
+                </div>
+                <div id="telemetryStatus" class="muted" style="text-align: center; font-size: 0.9em;">Requires DeepDrive to be run as Administrator.</div>
+            </section>
+
+            <section class="panel" style="border-top: 4px solid var(--danger);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2>Bloatware Purge</h2>
+                        <p class="muted">Safely uninstall pre-packaged OEM junk.</p>
+                    </div>
+                    <button id="scanBloatBtn"><i class="material-icons">radar</i> Scan Appx</button>
+                </div>
+
+                <div id="bloatLoader" class="loader"><i class="material-icons" style="animation: spin 1s linear infinite;">autorenew</i> Querying PowerShell...</div>
+                
+                <div id="bloatResults" style="margin-top: 16px;"></div>
+
+                <div id="deleteBloatRow" style="display: none; margin-top: 24px; text-align: right; border-top: 1px solid var(--border); padding-top: 16px;">
+                    <button id="executeBloatBtn" class="danger"><i class="material-icons">delete_sweep</i> Purge Selected Bloat</button>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div id="tab-radar" class="tab-content">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px;">
+            
+            <section class="panel">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2>Space Hogs</h2>
+                        <p class="muted">The 50 absolute largest files in your target directory.</p>
+                    </div>
+                    <button id="scanHogsBtn"><i class="material-icons">radar</i> Find Hogs</button>
+                </div>
+                
+                <div id="hogsLoader" class="loader"><i class="material-icons" style="animation: spin 1s linear infinite;">autorenew</i> Scanning...</div>
+                <div id="hogsResults" style="margin-top: 16px;"></div>
+                
+                <div id="deleteHogsRow" style="display: none; margin-top: 24px; text-align: right; border-top: 1px solid var(--border); padding-top: 16px;">
+                    <button id="executeHogsBtn" class="danger"><i class="material-icons">delete_forever</i> Delete Selected</button>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2>Time Machine</h2>
+                        <p class="muted">Large files (>50MB) not touched in over a year.</p>
+                    </div>
+                    <button id="scanStaleBtn" style="background: linear-gradient(135deg, #1976d2, #0d47a1);"><i class="material-icons">history</i> Find Stale Files</button>
+                </div>
+                
+                <div id="staleLoader" class="loader"><i class="material-icons" style="animation: spin 1s linear infinite;">autorenew</i> Traversing Time...</div>
+                <div id="staleResults" style="margin-top: 16px;"></div>
+
+                <div id="deleteStaleRow" style="display: none; margin-top: 24px; text-align: right; border-top: 1px solid var(--border); padding-top: 16px;">
+                    <button id="executeStaleBtn" class="danger"><i class="material-icons">delete_forever</i> Delete Selected</button>
                 </div>
             </section>
         </div>
@@ -291,7 +367,7 @@
             }
 
             let grandTotalWasted = 0;
-            let finalHtmlString = ""; // ⚡ BATCH RENDERING OPTIMIZATION
+            let finalHtmlString = ""; 
 
             duplicates.forEach(group => {
                 const groupWasted = group.size_bytes * (group.files.length - 1);
@@ -320,7 +396,6 @@
                 finalHtmlString += groupHtml; 
             });
 
-            // Inject the massive string into the screen exactly ONCE
             resultsDiv.innerHTML = finalHtmlString;
 
             if (grandTotalWasted > 0) {
@@ -331,7 +406,6 @@
         finally { loader.style.display = 'none'; }
     });
 
-    // Handle Duplicate Deletion
     document.getElementById('executeDeleteBtn').addEventListener('click', async () => {
         const files = Array.from(document.querySelectorAll('.dup-cb:checked')).map(cb => cb.value);
         if (files.length === 0) return;
@@ -343,13 +417,11 @@
                 body: JSON.stringify({ file_paths: files })
             });
             alert(`Success! Deleted ${res.deleted.length} files.`);
-            document.getElementById('runDedupBtn').click(); // Auto-refresh
+            document.getElementById('runDedupBtn').click(); 
         } catch (error) { alert("Deletion Error: " + error.message); }
     });
 
     // --- 3. WINDOWS DEEP CLEAN ---
-    
-    // Temp System
     document.getElementById('scanTempBtn').addEventListener('click', async () => {
         document.getElementById('scanTempBtn').textContent = 'Scanning...';
         try {
@@ -361,18 +433,16 @@
         finally { document.getElementById('scanTempBtn').textContent = 'Recalculate'; }
     });
 
-    // Temp Flush
     document.getElementById('flushTempBtn').addEventListener('click', async () => {
         if (!confirm("Aggressively delete Temp cache?")) return;
         try {
             const data = await fetchJson('http://localhost:8000/api/temp/flush', { method: 'POST' });
             alert(`Nuked ${data.deleted_count} items. Freed ${fmtBytes(data.freed_bytes)}. (Skipped ${data.locked_count} locked OS files).`);
             updateWastedStat(data.freed_bytes);
-            document.getElementById('scanTempBtn').click(); // Refresh
+            document.getElementById('scanTempBtn').click(); 
         } catch (error) { alert("Flush Error: " + error.message); }
     });
 
-    // Ghost Hunter
     const ghostResultsDiv = document.getElementById('ghostResults');
     const deleteGhostsRow = document.getElementById('deleteGhostsRow');
 
@@ -412,12 +482,11 @@
         finally { loader.style.display = 'none'; }
     });
 
-    // Handle Ghost Deletion
     document.getElementById('executeGhostDeleteBtn').addEventListener('click', async () => {
         const folders = Array.from(document.querySelectorAll('.ghost-cb:checked')).map(cb => cb.value);
         if (folders.length === 0) return;
         
-        if (!confirm(`WARNING: You are about to permanently delete ${folders.length} AppData folder(s).\n\nThis may delete saved games, custom preferences, or wallet data associated with uninstalled apps.\n\nAre you absolutely sure?`)) return;
+        if (!confirm(`WARNING: You are about to permanently delete ${folders.length} AppData folder(s).\n\nAre you absolutely sure?`)) return;
 
         try {
             const res = await fetchJson('http://localhost:8000/api/ghosts/delete', {
@@ -426,16 +495,188 @@
             });
             
             alert(`Success! Deleted ${res.deleted.length} orphaned folders.\nFreed ${fmtBytes(res.freed_bytes)} of space.`);
-            
-            if (res.failed.length > 0) {
-                console.error("Failed to delete some folders:", res.failed);
-                alert(`Failed to delete ${res.failed.length} folders. Check console for details.`);
+            updateWastedStat(res.freed_bytes);
+            document.getElementById('runGhostsBtn').click(); 
+        } catch (error) { alert("Ghost Deletion Error: " + error.message); }
+    });
+
+    // --- 4. OS DEBLOATER & PRIVACY ---
+    document.getElementById('telemetryBtn').addEventListener('click', async () => {
+        try {
+            const res = await fetchJson('http://localhost:8000/api/debloat/telemetry', { method: 'POST' });
+            document.getElementById('telemetryStatus').innerHTML = `<span style="color: green;">✔ ${res.message}</span>`;
+            alert("Privacy Tweaks Applied Successfully!");
+        } catch (error) { 
+            document.getElementById('telemetryStatus').innerHTML = `<span style="color: red;">✖ ${error.message}</span>`;
+            alert("Failed: You must restart your terminal/IDE as Administrator to apply registry tweaks."); 
+        }
+    });
+
+    const bloatResultsDiv = document.getElementById('bloatResults');
+    const deleteBloatRow = document.getElementById('deleteBloatRow');
+
+    document.getElementById('scanBloatBtn').addEventListener('click', async () => {
+        const loader = document.getElementById('bloatLoader');
+        bloatResultsDiv.innerHTML = '';
+        deleteBloatRow.style.display = 'none';
+        loader.style.display = 'block';
+
+        try {
+            const apps = await fetchJson('http://localhost:8000/api/debloat/scan');
+            if (apps.length === 0) {
+                bloatResultsDiv.innerHTML = '<p class="muted" style="text-align: center;">No known bloatware found!</p>';
+                return;
             }
 
-            updateWastedStat(res.freed_bytes);
-            document.getElementById('runGhostsBtn').click(); // Auto-refresh
+            let htmlString = "";
+            apps.forEach(app => {
+                htmlString += `
+                <div class="list-row" style="background: rgba(0,0,0,0.02); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; width: 100%;">
+                        <input type="checkbox" class="bloat-cb" value="${app.package_full_name}">
+                        <div style="display: flex; flex-direction: column;">
+                            <strong style="color: var(--ink);">${app.display_name}</strong>
+                            <span class="path-text" style="font-size: 0.75em;">${app.id}</span>
+                        </div>
+                    </label>
+                </div>`;
+            });
             
-        } catch (error) { alert("Ghost Deletion Error: " + error.message); }
+            bloatResultsDiv.innerHTML = htmlString;
+            deleteBloatRow.style.display = 'block';
+        } catch (error) { alert("Scanner Error: " + error.message); } 
+        finally { loader.style.display = 'none'; }
+    });
+
+    document.getElementById('executeBloatBtn').addEventListener('click', async () => {
+        const packages = Array.from(document.querySelectorAll('.bloat-cb:checked')).map(cb => cb.value);
+        if (packages.length === 0) return;
+        
+        if (!confirm(`Are you sure you want to run PowerShell to uninstall ${packages.length} system applications?`)) return;
+
+        document.getElementById('executeBloatBtn').textContent = "Purging...";
+        try {
+            const res = await fetchJson('http://localhost:8000/api/debloat/remove', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ packages: packages })
+            });
+            
+            alert(`Success! Uninstalled ${res.success.length} bloatware packages.`);
+            document.getElementById('scanBloatBtn').click(); 
+        } catch (error) { alert("Uninstall Error: " + error.message); }
+        finally { document.getElementById('executeBloatBtn').innerHTML = `<i class="material-icons">delete_sweep</i> Purge Selected Bloat`; }
+    });
+
+    // --- ⚡ 5. FILE RADAR (Top 50 & Stale) ---
+    const hogsResultsDiv = document.getElementById('hogsResults');
+    const deleteHogsRow = document.getElementById('deleteHogsRow');
+
+    document.getElementById('scanHogsBtn').addEventListener('click', async () => {
+        const path = document.getElementById('targetPath').value;
+        const loader = document.getElementById('hogsLoader');
+        hogsResultsDiv.innerHTML = '';
+        deleteHogsRow.style.display = 'none';
+        loader.style.display = 'block';
+
+        try {
+            const files = await fetchJson(`http://localhost:8000/api/radar/top50?target_path=${encodeURIComponent(path)}`);
+            if (files.length === 0) {
+                hogsResultsDiv.innerHTML = '<p class="muted" style="text-align: center;">No large files found.</p>';
+                return;
+            }
+
+            let htmlString = "";
+            files.forEach(f => {
+                htmlString += `
+                <div class="list-row" style="background: rgba(0,0,0,0.02); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; width: 100%;">
+                        <input type="checkbox" class="radar-cb" value="${f.path}">
+                        <div style="display: flex; flex-direction: column; width: 100%;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <strong style="color: var(--ink); word-break: break-all; padding-right: 10px;">${f.name}</strong>
+                                <span class="pill danger" style="padding: 2px 8px; white-space: nowrap; height: fit-content;">${fmtBytes(f.size_bytes)}</span>
+                            </div>
+                            <span class="path-text" style="font-size: 0.75em;">${f.path}</span>
+                        </div>
+                    </label>
+                </div>`;
+            });
+            hogsResultsDiv.innerHTML = htmlString;
+            deleteHogsRow.style.display = 'block';
+        } catch (error) { alert("Error: " + error.message); } 
+        finally { loader.style.display = 'none'; }
+    });
+
+    const staleResultsDiv = document.getElementById('staleResults');
+    const deleteStaleRow = document.getElementById('deleteStaleRow');
+
+    document.getElementById('scanStaleBtn').addEventListener('click', async () => {
+        const path = document.getElementById('targetPath').value;
+        const loader = document.getElementById('staleLoader');
+        staleResultsDiv.innerHTML = '';
+        deleteStaleRow.style.display = 'none';
+        loader.style.display = 'block';
+
+        try {
+            const files = await fetchJson(`http://localhost:8000/api/radar/stale?target_path=${encodeURIComponent(path)}`);
+            if (files.length === 0) {
+                staleResultsDiv.innerHTML = '<p class="muted" style="text-align: center;">No old stale files found!</p>';
+                return;
+            }
+
+            let htmlString = "";
+            files.forEach(f => {
+                const date = new Date(f.last_active_timestamp * 1000).toLocaleDateString();
+                htmlString += `
+                <div class="list-row" style="background: rgba(0,0,0,0.02); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #1976d2;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; width: 100%;">
+                        <input type="checkbox" class="radar-cb" value="${f.path}">
+                        <div style="display: flex; flex-direction: column; width: 100%;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <strong style="color: var(--ink); word-break: break-all; padding-right: 10px;">${f.name}</strong>
+                                <span class="pill danger" style="padding: 2px 8px; white-space: nowrap; height: fit-content;">${fmtBytes(f.size_bytes)}</span>
+                            </div>
+                            <span class="path-text" style="font-size: 0.75em;">Last Modified: ${date}</span>
+                        </div>
+                    </label>
+                </div>`;
+            });
+            staleResultsDiv.innerHTML = htmlString;
+            deleteStaleRow.style.display = 'block';
+        } catch (error) { alert("Error: " + error.message); } 
+        finally { loader.style.display = 'none'; }
+    });
+
+    // Universal Radar File Deleter (Reuses Deduplicator Endpoint)
+    const handleRadarDelete = async (btnId, clickEventBtn) => {
+        const section = document.getElementById(btnId).closest('.panel');
+        const files = Array.from(section.querySelectorAll('.radar-cb:checked')).map(cb => cb.value);
+        
+        if (files.length === 0) return;
+        if (!confirm(`Permanently delete ${files.length} files?`)) return;
+
+        try {
+            const res = await fetchJson('http://localhost:8000/api/delete', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_paths: files })
+            });
+            alert(`Success! Deleted ${res.deleted.length} files.`);
+            document.getElementById(clickEventBtn).click(); // Auto-refresh the specific list
+        } catch (error) { alert("Deletion Error: " + error.message); }
+    };
+
+    document.getElementById('executeHogsBtn').addEventListener('click', () => handleRadarDelete('executeHogsBtn', 'scanHogsBtn'));
+    document.getElementById('executeStaleBtn').addEventListener('click', () => handleRadarDelete('executeStaleBtn', 'scanStaleBtn'));
+
+    // Bonus: Make the global Set Target button refresh the current active tab
+    document.getElementById('globalScanBtn').addEventListener('click', () => {
+        const activeTabBtn = document.querySelector('.tab-btn.active');
+        if (activeTabBtn.dataset.target === 'tab-mapper') document.getElementById('runMapperBtn').click();
+        if (activeTabBtn.dataset.target === 'tab-dedup') document.getElementById('runDedupBtn').click();
+        if (activeTabBtn.dataset.target === 'tab-radar') {
+            document.getElementById('scanHogsBtn').click();
+            document.getElementById('scanStaleBtn').click();
+        }
     });
 </script>
 
