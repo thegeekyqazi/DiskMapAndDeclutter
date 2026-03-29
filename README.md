@@ -5,6 +5,7 @@
 This project is an early visualization tool, not a full decluttering system. Current limitations:
 
 - No file deletion
+- No file moving
 - No sorting controls
 - No file-type breakdown
 - No progress indicator for very large scans beyond the spinner
