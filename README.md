@@ -11,7 +11,7 @@ Most storage tools jump too quickly from "scan" to "delete." This project is try
 - show where the space is
 - highlight things that look worth reviewing
 - help you keep track of what you already checked
-- surface duplicate and stale-file candidates
+- surface duplicate and stale-file candidates 
 - let you inspect file contents before acting
 - keep strong guardrails so a mistake in the app does not become a mistake on your PC
 
