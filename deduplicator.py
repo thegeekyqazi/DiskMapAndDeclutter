@@ -27,7 +27,7 @@ def find_duplicates(target_dir: str) -> list:
                     if entry.is_file(follow_symlinks=False):
                         try:
                             file_size = entry.stat(follow_symlinks=False).st_size
-                            if file_size > 0: # Ignore 0-byte ghost files
+                            if file_size > 1_048_576: # Ignore files smaller than 1mb
                                 size_groups[file_size].append(entry.path)
                         except (OSError, FileNotFoundError):
                             pass

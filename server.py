@@ -6,8 +6,9 @@ from pydantic import BaseModel
 # --- Import All 4 Custom Engines ---
 from ScannerEngine import build_storage_tree, flatten_for_plotly
 from deduplicator import find_duplicates, delete_selected_files
-from GhostHunter import find_ghost_folders
+
 from TempEngine import scan_temp_space, flush_temp_files
+from GhostHunter import find_ghost_folders, delete_ghost_folders
 
 app = FastAPI(title="System Declutter Master API")
 
@@ -23,7 +24,8 @@ app.add_middleware(
 # Expected data structure for the deduplicator's delete request
 class DeleteRequest(BaseModel):
     file_paths: list[str]
-
+class DeleteFolderRequest(BaseModel):
+    folder_paths: list[str]
 
 # ==========================================
 # TAB 1: VISUAL DISK MAPPER
@@ -84,3 +86,13 @@ def flush_temp():
         return flush_temp_files()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Temp Flush Error: {str(e)}")
+    
+@app.post("/api/ghosts/delete")
+def delete_ghosts(request: DeleteFolderRequest):
+    """Accepts a list of folder paths and recursively deletes them."""
+    if not request.folder_paths:
+        raise HTTPException(status_code=400, detail="No folders provided for deletion.")
+    try:
+        return delete_ghost_folders(request.folder_paths)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ghost Deletion Error: {str(e)}")

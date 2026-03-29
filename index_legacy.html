@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Declutter & Visualizer</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+    <style>
+        body { background-color: #f5f5f5; }
+        .app-header { margin-top: 30px; margin-bottom: 20px; }
+        .tabs .tab a { color: #1976d2; font-weight: bold; }
+        .tabs .tab a:hover, .tabs .tab a.active { color: #0d47a1; background-color: #e3f2fd; }
+        .tabs .indicator { background-color: #0d47a1; height: 3px; }
+        
+        /* Visualizer */
+        #chart-container { 
+            width: 100%; height: 70vh; background: white; 
+            border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex; justify-content: center; align-items: center; position: relative;
+        }
+        
+        /* Deduplicator & Deep Clean */
+        .duplicate-group, .ghost-group { margin-bottom: 20px; border-left: 5px solid; }
+        .duplicate-group { border-color: #ff9800; }
+        .ghost-group { border-color: #9c27b0; }
+        .file-path-text { word-break: break-all; font-family: monospace; font-size: 0.9em; }
+        #delete-btn-container { position: sticky; bottom: 20px; z-index: 1000; display: none; }
+        
+        .loader-wrapper { display: none; text-align: center; margin-top: 50px; }
+        .stat-box { padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e0e0e0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="row app-header center-align">
+        <h4><i class="material-icons medium vertical-align-bottom">storage</i> System Declutter</h4>
+    </div>
+
+    <div class="row card-panel">
+        <div class="input-field col s12">
+            <i class="material-icons prefix">folder</i>
+            <input id="target_path" type="text" value="C:\Users\Qazi\Desktop\DiskMapAndDeclutter">
+            <label for="target_path">Target Directory Path (For Mapper & Deduplicator)</label>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col s12">
+            <ul class="tabs z-depth-1">
+                <li class="tab col s4"><a class="active" href="#visualizer-tab">Visual Mapper</a></li>
+                <li class="tab col s4"><a href="#dedup-tab">Smart Deduplicator</a></li>
+                <li class="tab col s4"><a href="#windows-tab">Windows Deep Clean</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="visualizer-tab" class="col s12">
+        <div class="center-align" style="margin-bottom: 20px; margin-top: 10px;">
+            <button id="scan-visual-btn" class="btn waves-effect waves-light blue darken-2">
+                Generate Map <i class="material-icons right">pie_chart</i>
+            </button>
+        </div>
+        
+        <div id="chart-container">
+            <div id="visual-loader" class="loader-wrapper preloader-wrapper big active">
+                <div class="spinner-layer spinner-blue-only">
+                    <div class="circle-clipper left"><div class="circle"></div></div>
+                </div>
+            </div>
+            <div id="sunburst-chart" style="width: 100%; height: 100%;"></div>
+        </div>
+    </div>
+
+    <div id="dedup-tab" class="col s12">
+        <div class="center-align" style="margin-bottom: 20px; margin-top: 10px;">
+            <button id="scan-dedup-btn" class="btn waves-effect waves-light orange darken-2">
+                Find Duplicates <i class="material-icons right">search</i>
+            </button>
+        </div>
+
+        <div id="dedup-loader" class="loader-wrapper preloader-wrapper big active">
+            <div class="spinner-layer spinner-orange-only">
+                <div class="circle-clipper left"><div class="circle"></div></div>
+            </div>
+        </div>
+
+        <div id="dedup-summary" class="row" style="display: none; margin-bottom: 0;">
+            <div class="col s12">
+                <div class="card-panel red lighten-5 red-text text-darken-4 center-align" style="font-size: 1.2em; font-weight: bold;">
+                    <i class="material-icons vertical-align-bottom">warning</i> 
+                    Total Wasted Space: <span id="total-wasted-space">0 MB</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="duplicate-results" style="margin-bottom: 80px;"></div>
+
+        <div id="delete-btn-container" class="center-align">
+            <button id="execute-delete-btn" class="btn-large waves-effect waves-light red darken-2 pulse">
+                <i class="material-icons left">delete_forever</i> Delete Selected Files
+            </button>
+        </div>
+    </div>
+
+    <div id="windows-tab" class="col s12">
+        
+        <div class="card-panel center-align" style="margin-top: 10px; border: 2px dashed #f44336; background-color: #fafafa;">
+            <h5>System Temp Cache</h5>
+            <p class="grey-text">These files are safe to delete. They are leftovers from software installers and app usage.</p>
+            
+            <div id="temp-stat-box" class="stat-box grey lighten-4" style="display: none;">
+                <h4 class="red-text text-darken-2" style="margin: 0;"><span id="temp-size-text">0 MB</span></h4>
+                <span class="grey-text" id="temp-file-count">0 files found</span>
+            </div>
+
+            <button id="scan-temp-btn" class="btn waves-effect waves-light grey darken-2" style="margin-right: 10px;">
+                Calculate Temp Space <i class="material-icons left">calculate</i>
+            </button>
+            <button id="flush-temp-btn" class="btn waves-effect waves-light red darken-2 disabled">
+                Flush Temp Data <i class="material-icons right">whatshot</i>
+            </button>
+        </div>
+
+        <div class="center-align" style="margin-top: 40px; margin-bottom: 20px;">
+            <button id="scan-ghosts-btn" class="btn waves-effect waves-light purple darken-2">
+                Hunt AppData Ghosts <i class="material-icons right">visibility</i>
+            </button>
+        </div>
+
+        <div id="ghost-loader" class="loader-wrapper preloader-wrapper big active">
+            <div class="spinner-layer spinner-purple-only">
+                <div class="circle-clipper left"><div class="circle"></div></div>
+            </div>
+        </div>
+
+        <div id="ghost-results" style="margin-bottom: 50px;"></div>
+
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        M.Tabs.init(document.querySelectorAll('.tabs'));
+    });
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // --- TAB 1: VISUALIZER ---
+    document.getElementById('scan-visual-btn').addEventListener('click', async () => {
+        const path = document.getElementById('target_path').value;
+        const loader = document.getElementById('visual-loader');
+        const chartDiv = document.getElementById('sunburst-chart');
+
+        Plotly.purge(chartDiv);
+        loader.style.display = 'inline-block';
+
+        try {
+            const response = await fetch(`http://localhost:8000/api/scan?target_path=${encodeURIComponent(path)}`);
+            if (!response.ok) throw new Error("Failed to map directory");
+            const data = await response.json();
+
+            const trace = [{
+                type: "sunburst", ids: data.ids, labels: data.labels,
+                parents: data.parents, values: data.values,
+                branchvalues: 'total', maxdepth: 3,
+                textinfo: "label+value+percent parent",
+                hovertemplate: '<b>%{label}</b><br>Size: %{value} bytes<br><extra></extra>',
+            }];
+            Plotly.newPlot(chartDiv, trace, { margin: { l: 0, r: 0, b: 0, t: 0 }, paper_bgcolor: 'transparent' });
+        } catch (error) { M.toast({html: error.message, classes: 'red rounded'}); } 
+        finally { loader.style.display = 'none'; }
+    });
+
+    // --- TAB 2: DEDUPLICATOR ---
+    document.getElementById('scan-dedup-btn').addEventListener('click', async () => {
+        const path = document.getElementById('target_path').value;
+        const loader = document.getElementById('dedup-loader');
+        const resultsDiv = document.getElementById('duplicate-results');
+        const summaryBanner = document.getElementById('dedup-summary');
+        const deleteBtn = document.getElementById('delete-btn-container');
+
+        resultsDiv.innerHTML = '';
+        deleteBtn.style.display = 'none';
+        summaryBanner.style.display = 'none';
+        loader.style.display = 'inline-block';
+
+        try {
+            const response = await fetch(`http://localhost:8000/api/duplicates?target_path=${encodeURIComponent(path)}`);
+            if (!response.ok) throw new Error("Failed to scan for duplicates");
+            const duplicates = await response.json();
+
+            if (duplicates.length === 0) {
+                resultsDiv.innerHTML = '<h5 class="center-align grey-text">No duplicates found!</h5>';
+                return;
+            }
+
+            let grandTotalWasted = 0;
+            duplicates.forEach(group => {
+                const groupWasted = group.size_bytes * (group.files.length - 1);
+                grandTotalWasted += groupWasted;
+                
+                let html = `<div class="card duplicate-group"><div class="card-content">
+                    <span class="card-title">Identical Files (Wasting ${formatBytes(groupWasted)})</span>
+                    <ul class="collection">`;
+                
+                group.files.forEach((filePath, idx) => {
+                    const isChecked = idx > 0 ? 'checked' : '';
+                    const tag = idx === 0 ? '<span class="new badge blue" data-badge-caption="Keep"></span>' : '';
+                    html += `<li class="collection-item"><label>
+                                <input type="checkbox" class="dup-checkbox" value="${filePath}" ${isChecked} />
+                                <span class="file-path-text">${filePath} ${tag}</span>
+                             </label></li>`;
+                });
+                html += `</ul></div></div>`;
+                resultsDiv.innerHTML += html;
+            });
+
+            if (grandTotalWasted > 0) {
+                document.getElementById('total-wasted-space').innerText = formatBytes(grandTotalWasted);
+                summaryBanner.style.display = 'block';
+                deleteBtn.style.display = 'block';
+            }
+        } catch (error) { M.toast({html: error.message, classes: 'red rounded'}); } 
+        finally { loader.style.display = 'none'; }
+    });
+
+    document.getElementById('execute-delete-btn').addEventListener('click', async () => {
+        const filesToDelete = Array.from(document.querySelectorAll('.dup-checkbox:checked')).map(cb => cb.value);
+        if (filesToDelete.length === 0) return;
+        if (!confirm(`Permanently delete ${filesToDelete.length} files?`)) return;
+
+        try {
+            const res = await fetch('http://localhost:8000/api/delete', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_paths: filesToDelete })
+            });
+            const result = await res.json();
+            M.toast({html: `Deleted ${result.deleted.length} files!`, classes: 'green rounded'});
+            document.getElementById('scan-dedup-btn').click(); // Auto-refresh
+        } catch (error) { M.toast({html: error.message, classes: 'red rounded'}); }
+    });
+
+    // --- TAB 3: WINDOWS DEEP CLEAN (Ghosts & Temp) ---
+    
+    // Temp Scanner
+    document.getElementById('scan-temp-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('scan-temp-btn');
+        btn.classList.add('disabled');
+        btn.innerHTML = 'Calculating... <i class="material-icons left">loop</i>';
+        
+        try {
+            const res = await fetch('http://localhost:8000/api/temp/scan');
+            const data = await res.json();
+            
+            document.getElementById('temp-size-text').innerText = formatBytes(data.total_bytes);
+            document.getElementById('temp-file-count').innerText = `${data.total_files} files found`;
+            document.getElementById('temp-stat-box').style.display = 'block';
+            
+            if (data.total_bytes > 0) {
+                document.getElementById('flush-temp-btn').classList.remove('disabled');
+            }
+        } catch (error) { M.toast({html: error.message, classes: 'red rounded'}); }
+        finally {
+            btn.classList.remove('disabled');
+            btn.innerHTML = 'Recalculate <i class="material-icons left">refresh</i>';
+        }
+    });
+
+    // Temp Flusher
+    document.getElementById('flush-temp-btn').addEventListener('click', async () => {
+        if (!confirm("Are you sure you want to aggressively delete all Temp files? (Locked files currently in use by Windows will be safely skipped).")) return;
+        
+        const flushBtn = document.getElementById('flush-temp-btn');
+        flushBtn.classList.add('disabled');
+        flushBtn.innerHTML = 'Flushing... <i class="material-icons right">hourglass_empty</i>';
+
+        try {
+            const res = await fetch('http://localhost:8000/api/temp/flush', { method: 'POST' });
+            const data = await res.json();
+            
+            M.toast({html: `Nuked ${data.deleted_count} items! Freed ${formatBytes(data.freed_bytes)}.`, classes: 'green rounded', displayLength: 5000});
+            if (data.locked_count > 0) {
+                M.toast({html: `Skipped ${data.locked_count} locked files in use by Windows.`, classes: 'orange rounded', displayLength: 5000});
+            }
+            
+            // Auto-recalculate
+            document.getElementById('scan-temp-btn').click();
+            
+        } catch (error) { M.toast({html: error.message, classes: 'red rounded'}); }
+        finally {
+            flushBtn.innerHTML = 'Flush Temp Data <i class="material-icons right">whatshot</i>';
+        }
+    });
+
+    // Ghost Hunter
+    document.getElementById('scan-ghosts-btn').addEventListener('click', async () => {
+        const loader = document.getElementById('ghost-loader');
+        const resultsDiv = document.getElementById('ghost-results');
+        
+        resultsDiv.innerHTML = '';
+        loader.style.display = 'inline-block';
+
+        try {
+            const res = await fetch('http://localhost:8000/api/ghosts');
+            const ghosts = await res.json();
+            
+            if (ghosts.length === 0) {
+                resultsDiv.innerHTML = '<h5 class="center-align grey-text">No ghosts found! Your AppData is clean.</h5>';
+                return;
+            }
+
+            let html = '<h5 class="purple-text text-darken-2">Orphaned Publisher Folders Found:</h5>';
+            ghosts.forEach(ghost => {
+                html += `
+                <div class="card ghost-group">
+                    <div class="card-content">
+                        <span class="card-title bold">${ghost.name} <span class="badge red white-text" style="font-size: 0.8em; border-radius: 4px;">Wasting ${formatBytes(ghost.size_bytes)}</span></span>
+                        <p class="file-path-text grey-text"><i class="material-icons tiny">folder_open</i> ${ghost.path}</p>
+                        <p style="margin-top: 10px; font-size: 0.9em;"><em>Note: Because AppData contains sensitive config data, you should manually verify and delete this folder using Windows Explorer.</em></p>
+                    </div>
+                </div>`;
+            });
+            resultsDiv.innerHTML = html;
+
+        } catch (error) { M.toast({html: error.message, classes: 'red rounded'}); }
+        finally { loader.style.display = 'none'; }
+    });
+</script>
+
+</body>
+</html>

@@ -1,9 +1,9 @@
 import os
 import winreg
 import difflib
+import shutil
 from pathlib import Path
 
-# ⚡ FIX 1: Expanded safety whitelist based on your real-world test
 WHITELIST = {
     "microsoft", "windows", "intel", "amd", "nvidia", 
     "realtek", "synaptics", "temp", "packages",
@@ -32,7 +32,6 @@ def get_installed_software() -> set:
                     if display_name:
                         software_names.add(display_name.strip().lower())
                         
-                    # ⚡ FIX 2: Grab the Publisher Name (e.g. "Brave Software Inc")
                     try:
                         publisher, _ = winreg.QueryValueEx(subkey, "Publisher")
                         if publisher:
@@ -89,8 +88,6 @@ def find_ghost_folders() -> list:
                         is_ghost = True 
                         
                         for app_name in installed_software:
-                            # ⚡ FIX 3: Bi-directional substring check
-                            # This catches "brave" inside "bravesoftware"
                             if folder_name in app_name or app_name in folder_name:
                                 is_ghost = False
                                 break
@@ -113,6 +110,42 @@ def find_ghost_folders() -> list:
 
     ghosts.sort(key=lambda x: x["size_bytes"], reverse=True)
     return ghosts
+
+def delete_ghost_folders(folder_paths: list) -> dict:
+    """
+    Safely deletes orphaned AppData folders.
+    Includes a hardcoded security check to prevent deleting files outside AppData.
+    """
+    results = {"deleted": [], "failed": [], "freed_bytes": 0}
+    
+    appdata_local = os.environ.get('LOCALAPPDATA', '').lower()
+    appdata_roaming = os.environ.get('APPDATA', '').lower()
+
+    for path in folder_paths:
+        try:
+            if os.path.exists(path) and os.path.isdir(path):
+                path_lower = path.lower()
+                
+                # ⚡ SECURITY GUARDRAIL: Only allow deletion if the path is strictly inside AppData
+                if (appdata_local and path_lower.startswith(appdata_local)) or \
+                   (appdata_roaming and path_lower.startswith(appdata_roaming)):
+                    
+                    # Calculate size before deleting for the UI metrics
+                    size_bytes = get_folder_size(path)
+                    
+                    # Nuke the directory
+                    shutil.rmtree(path)
+                    
+                    results["deleted"].append(path)
+                    results["freed_bytes"] += size_bytes
+                else:
+                    results["failed"].append({"path": path, "error": "Security Block: Path is not inside AppData."})
+            else:
+                results["failed"].append({"path": path, "error": "Folder not found or is not a directory."})
+        except Exception as e:
+            results["failed"].append({"path": path, "error": str(e)})
+            
+    return results
 
 if __name__ == "__main__":
     results = find_ghost_folders()
