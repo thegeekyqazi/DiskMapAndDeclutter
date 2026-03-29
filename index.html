@@ -12,113 +12,243 @@
 
     <style>
         body { background-color: #f5f5f5; }
-        .app-header { margin-top: 40px; margin-bottom: 40px; }
+        .app-header { margin-top: 30px; margin-bottom: 20px; }
+        .tabs .tab a { color: #1976d2; }
+        .tabs .tab a:hover, .tabs .tab a.active { color: #0d47a1; }
+        .tabs .indicator { background-color: #0d47a1; }
+        
+        /* Visualizer Styles */
         #chart-container { 
-            width: 100%; 
-            height: 75vh; 
-            background: white; 
-            border-radius: 8px; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
+            width: 100%; height: 70vh; background: white; 
+            border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex; justify-content: center; align-items: center; position: relative;
         }
-        /* Loading Spinner */
-        #loader { display: none; }
+        
+        /* Deduplicator Styles */
+        .duplicate-group { margin-bottom: 20px; border-left: 5px solid #ff9800; }
+        .file-path-text { word-break: break-all; font-family: monospace; font-size: 0.9em; }
+        #delete-btn-container { position: sticky; bottom: 20px; z-index: 1000; display: none; }
+        
+        .loader-wrapper { display: none; text-align: center; margin-top: 50px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="row app-header center-align">
-        <h4><i class="material-icons medium vertical-align-bottom">pie_chart</i> Storage Visualizer</h4>
-        <p class="grey-text">Map your directories and identify massive folders.</p>
+        <h4><i class="material-icons medium vertical-align-bottom">storage</i> System Declutter</h4>
     </div>
 
     <div class="row card-panel">
-        <div class="input-field col s9">
+        <div class="input-field col s12">
             <i class="material-icons prefix">folder</i>
-            <input id="target_path" type="text" value="">
+            <input id="target_path" type="text" value="/home/geeki/stuff/coding">
             <label for="target_path">Target Directory Path</label>
-        </div>
-        <div class="input-field col s3 center-align">
-            <button id="scan-btn" class="btn waves-effect waves-light blue darken-2" style="width: 100%;">
-                Scan Drive
-                <i class="material-icons right">search</i>
-            </button>
         </div>
     </div>
 
     <div class="row">
         <div class="col s12">
-            <div id="chart-container">
-                <div id="loader" class="preloader-wrapper big active">
-                    <div class="spinner-layer spinner-blue-only">
-                        <div class="circle-clipper left"><div class="circle"></div></div>
-                        <div class="gap-patch"><div class="circle"></div></div>
-                        <div class="circle-clipper right"><div class="circle"></div></div>
-                    </div>
+            <ul class="tabs z-depth-1">
+                <li class="tab col s6"><a class="active" href="#visualizer-tab">Visual Disk Mapper</a></li>
+                <li class="tab col s6"><a href="#dedup-tab">Smart Deduplicator</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="visualizer-tab" class="col s12">
+        <div class="center-align" style="margin-bottom: 20px;">
+            <button id="scan-visual-btn" class="btn waves-effect waves-light blue darken-2">
+                Generate Map <i class="material-icons right">pie_chart</i>
+            </button>
+        </div>
+        
+        <div id="chart-container">
+            <div id="visual-loader" class="loader-wrapper preloader-wrapper big active">
+                <div class="spinner-layer spinner-blue-only">
+                    <div class="circle-clipper left"><div class="circle"></div></div>
+                    <div class="gap-patch"><div class="circle"></div></div>
+                    <div class="circle-clipper right"><div class="circle"></div></div>
                 </div>
-                <div id="sunburst-chart" style="width: 100%; height: 100%;"></div>
             </div>
+            <div id="sunburst-chart" style="width: 100%; height: 100%;"></div>
+        </div>
+    </div>
+
+    <div id="dedup-tab" class="col s12">
+        <div class="center-align" style="margin-bottom: 20px;">
+            <button id="scan-dedup-btn" class="btn waves-effect waves-light orange darken-2">
+                Find Duplicates <i class="material-icons right">search</i>
+            </button>
+        </div>
+
+        <div id="dedup-loader" class="loader-wrapper preloader-wrapper big active">
+            <div class="spinner-layer spinner-orange-only">
+                <div class="circle-clipper left"><div class="circle"></div></div>
+                <div class="gap-patch"><div class="circle"></div></div>
+                <div class="circle-clipper right"><div class="circle"></div></div>
+            </div>
+        </div>
+
+        <div id="duplicate-results" style="margin-bottom: 80px;"></div>
+
+        <div id="delete-btn-container" class="center-align">
+            <button id="execute-delete-btn" class="btn-large waves-effect waves-light red darken-2 pulse">
+                <i class="material-icons left">delete_forever</i> Delete Selected Files
+            </button>
         </div>
     </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 <script>
-    document.getElementById('scan-btn').addEventListener('click', async () => {
-        const targetPath = document.getElementById('target_path').value;
-        const loader = document.getElementById('loader');
-        const chartDiv = document.getElementById('sunburst-chart');
-        const btn = document.getElementById('scan-btn');
+    // Initialize Materialize UI components
+    document.addEventListener('DOMContentLoaded', function() {
+        M.Tabs.init(document.querySelectorAll('.tabs'));
+    });
 
-        // UI Reset
+    // Helper: Format bytes to human readable sizes
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // ==========================================
+    // LOGIC: VISUALIZER TAB
+    // ==========================================
+    document.getElementById('scan-visual-btn').addEventListener('click', async () => {
+        const path = document.getElementById('target_path').value;
+        const loader = document.getElementById('visual-loader');
+        const chartDiv = document.getElementById('sunburst-chart');
+
         Plotly.purge(chartDiv);
-        loader.style.display = 'block';
-        btn.disabled = true;
+        loader.style.display = 'inline-block';
 
         try {
-            // Call your local FastAPI bridge
-            const response = await fetch(`http://localhost:8000/api/scan?target_path=${encodeURIComponent(targetPath)}`);
-            
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || "Failed to fetch data");
-            }
-
+            const response = await fetch(`http://localhost:8000/api/scan?target_path=${encodeURIComponent(path)}`);
+            if (!response.ok) throw new Error("Failed to map directory");
             const data = await response.json();
 
-            // Plotly Configuration
             const trace = [{
-                type: "sunburst",
-                ids: data.ids,
-                labels: data.labels,
-                parents: data.parents,
-                values: data.values,
-                branchvalues: 'total', // CRITICAL: Tells Plotly that parent size = sum of children
-                maxdepth: 3,
+                type: "sunburst", ids: data.ids, labels: data.labels,
+                parents: data.parents, values: data.values,
+                branchvalues: 'total', maxdepth: 3,
                 textinfo: "label+value+percent parent",
-                hovertemplate: '<b>%{label}</b><br>Size: %{value} bytes<br>Parent: %{parent}<extra></extra>',
-                marker: { line: { width: 1, color: 'white' } }
+                hovertemplate: '<b>%{label}</b><br>Size: %{value} bytes<br><extra></extra>',
             }];
-
-            const layout = {
-                margin: { l: 0, r: 0, b: 0, t: 0 },
-                sunburstcolorway: ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"],
-                paper_bgcolor: 'transparent'
-            };
-
-            // Render the chart
-            Plotly.newPlot(chartDiv, trace, layout, {responsive: true});
-
+            
+            Plotly.newPlot(chartDiv, trace, { margin: { l: 0, r: 0, b: 0, t: 0 }, paper_bgcolor: 'transparent' });
         } catch (error) {
-            M.toast({html: `Error: ${error.message}`, classes: 'red rounded'});
-            console.error(error);
+            M.toast({html: error.message, classes: 'red rounded'});
         } finally {
             loader.style.display = 'none';
-            btn.disabled = false;
+        }
+    });
+
+    // ==========================================
+    // LOGIC: DEDUPLICATOR TAB
+    // ==========================================
+    const resultsDiv = document.getElementById('duplicate-results');
+    const deleteBtnContainer = document.getElementById('delete-btn-container');
+
+    document.getElementById('scan-dedup-btn').addEventListener('click', async () => {
+        const path = document.getElementById('target_path').value;
+        const loader = document.getElementById('dedup-loader');
+
+        resultsDiv.innerHTML = '';
+        deleteBtnContainer.style.display = 'none';
+        loader.style.display = 'inline-block';
+
+        try {
+            const response = await fetch(`http://localhost:8000/api/duplicates?target_path=${encodeURIComponent(path)}`);
+            if (!response.ok) throw new Error("Failed to scan for duplicates");
+            const duplicates = await response.json();
+
+            if (duplicates.length === 0) {
+                resultsDiv.innerHTML = '<h5 class="center-align grey-text">No duplicates found! Your drive is clean.</h5>';
+                return;
+            }
+
+            // Render the UI
+            duplicates.forEach((group, groupIndex) => {
+                const totalWasted = formatBytes(group.size_bytes * (group.files.length - 1));
+                
+                let html = `
+                <div class="card duplicate-group">
+                    <div class="card-content">
+                        <span class="card-title">Identical Files Found (Wasting ${totalWasted})</span>
+                        <p class="grey-text">File Size: ${formatBytes(group.size_bytes)} | SHA-256: ${group.hash.substring(0, 16)}...</p>
+                        <ul class="collection">`;
+                
+                group.files.forEach((filePath, fileIndex) => {
+                    // Auto-check all clones, leave the first file (index 0) unchecked
+                    const isChecked = fileIndex > 0 ? 'checked' : '';
+                    const tag = fileIndex === 0 ? '<span class="new badge blue" data-badge-caption="Keep"></span>' : '';
+                    
+                    html += `
+                            <li class="collection-item">
+                                <label>
+                                    <input type="checkbox" class="dup-checkbox" value="${filePath}" ${isChecked} />
+                                    <span class="file-path-text">${filePath} ${tag}</span>
+                                </label>
+                            </li>`;
+                });
+                
+                html += `</ul></div></div>`;
+                resultsDiv.innerHTML += html;
+            });
+
+            deleteBtnContainer.style.display = 'block';
+
+        } catch (error) {
+            M.toast({html: error.message, classes: 'red rounded'});
+        } finally {
+            loader.style.display = 'none';
+        }
+    });
+
+    // ==========================================
+    // LOGIC: DELETION EXECUTION
+    // ==========================================
+    document.getElementById('execute-delete-btn').addEventListener('click', async () => {
+        const checkboxes = document.querySelectorAll('.dup-checkbox:checked');
+        const filesToDelete = Array.from(checkboxes).map(cb => cb.value);
+
+        if (filesToDelete.length === 0) {
+            M.toast({html: 'No files selected to delete.', classes: 'orange rounded'});
+            return;
+        }
+
+        // Final safety check
+        if (!confirm(`Are you absolutely sure you want to PERMANENTLY delete these ${filesToDelete.length} files?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch('http://localhost:8000/api/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_paths: filesToDelete })
+            });
+
+            if (!response.ok) throw new Error("Server rejected deletion request");
+            const result = await response.json();
+
+            M.toast({html: `Successfully deleted ${result.deleted.length} files!`, classes: 'green rounded'});
+            
+            if (result.failed.length > 0) {
+                M.toast({html: `Failed to delete ${result.failed.length} files.`, classes: 'red rounded'});
+                console.error("Deletion Failures:", result.failed);
+            }
+
+            // Immediately re-trigger the duplicate scan to refresh the UI
+            document.getElementById('scan-dedup-btn').click();
+
+        } catch (error) {
+            M.toast({html: error.message, classes: 'red rounded'});
         }
     });
 </script>

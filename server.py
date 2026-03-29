@@ -1,9 +1,11 @@
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-# Import your custom logic from ScannerEngine.py
+# Import both engines
 from ScannerEngine import build_storage_tree, flatten_for_plotly
+from deduplicator import find_duplicates, delete_selected_files
 
 app = FastAPI(title="Declutter Engine API")
 
@@ -15,17 +17,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Define the Expected Data Structure for Deletion ---
+class DeleteRequest(BaseModel):
+    file_paths: list[str]
+
+# --- Visualization Endpoint ---
 @app.get("/api/scan")
 def scan_directory(target_path: str = "."):
-   
     if not os.path.exists(target_path):
         raise HTTPException(status_code=404, detail="Directory not found")
-    
     try:
-        # Call the functions imported from ScannerEngine
         raw_tree = build_storage_tree(target_path)
-        plotly_data = flatten_for_plotly(raw_tree)
-        return plotly_data
+        return flatten_for_plotly(raw_tree)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+
+# --- Deduplicator Endpoints ---
+@app.get("/api/duplicates")
+def get_duplicates(target_path: str = "."):
+    """Runs the 3-stage funnel and returns the list of duplicates."""
+    if not os.path.exists(target_path):
+        raise HTTPException(status_code=404, detail="Directory not found")
+    try:
+        return find_duplicates(target_path)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@app.post("/api/delete")
+def delete_files(request: DeleteRequest):
+    """Accepts a list of file paths and deletes them."""
+    if not request.file_paths:
+        raise HTTPException(status_code=400, detail="No files provided for deletion.")
     
+    # Call the new deletion function
+    return delete_selected_files(request.file_paths)
