@@ -8,9 +8,11 @@ LINUX_BLACKLIST = {
     "/proc", "/sys", "/dev", "/run", "/snap", "/var/lib/lxcfs"
 }
 
-def build_storage_tree(root_path: str) -> dict:
+def build_storage_tree(root_path: str,ignore_folders: list = None) -> dict:
     target_dir = Path(root_path).resolve()
     current_os = platform.system()
+    ignore_set = set(ignore_folders or [])
+
 
     if current_os == "Windows":
         if str(target_dir).lower().startswith(r"c:\windows"):
@@ -24,7 +26,7 @@ def build_storage_tree(root_path: str) -> dict:
             "children": []
         }
 
-        # ⚡ GUARDRAIL: Instantly abort if entering a virtual kernel directory
+        #GUARDRAIL: Instantly abort if entering a virtual kernel directory
         if current_os == "Linux" and current_path in LINUX_BLACKLIST:
             return node
 
@@ -38,14 +40,13 @@ def build_storage_tree(root_path: str) -> dict:
                             pass
                             
                     elif entry.is_dir(follow_symlinks=False):
-                        if entry.name in ['.git', 'node_modules', '__pycache__']:
+                       
+                        if entry.name in ignore_set:
                             continue
                             
-                        # Recursively scan the child directory
                         child_node = _scan(entry.path)
                         node["size"] += child_node["size"]
                         
-                        # Only keep children larger than 1MB to keep the UI snappy
                         if child_node["size"] > 1_048_576:
                             node["children"].append(child_node)
                             

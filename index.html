@@ -153,13 +153,23 @@
                 <button id="globalScanBtn"><i class="material-icons">radar</i> Set Target</button>
             </div>
         </div>
+        <div class="field" style="margin-top: 16px;">
+            <label class="label" for="ignoreFolders">Ignore Folders (comma-separated)</label>
+            <input id="ignoreFolders" type="text" placeholder="e.g. steam, .local, node_modules">
+        </div>
     </section>
 
     <nav class="tab-nav">
         <button class="tab-btn active" data-target="tab-mapper"><i class="material-icons">pie_chart</i> Visual Mapper</button>
         <button class="tab-btn" data-target="tab-dedup"><i class="material-icons">file_copy</i> Smart Deduplicator</button>
-        <button class="tab-btn" data-target="tab-windows"><i class="material-icons">memory</i> Windows Deep Clean</button>
-        <button class="tab-btn" data-target="tab-debloat"><i class="material-icons">security</i> OS Debloater</button>
+        <button class="tab-btn" data-target="tab-windows" style="flex-direction: column; gap: 4px;">
+            <div><i class="material-icons" style="font-size: 1.1em; vertical-align: middle;">memory</i> Windows Deep Clean</div>
+            <span class="pill danger" style="font-size: 0.6em; padding: 2px 6px;">Windows Only</span>
+        </button>
+        <button class="tab-btn" data-target="tab-debloat" style="flex-direction: column; gap: 4px;">
+            <div><i class="material-icons" style="font-size: 1.1em; vertical-align: middle;">security</i> OS Debloater</div>
+            <span class="pill danger" style="font-size: 0.6em; padding: 2px 6px;">Windows Only</span>
+        </button>
         <button class="tab-btn" data-target="tab-radar"><i class="material-icons">manage_search</i> File Radar</button>
     </nav>
 
@@ -343,10 +353,30 @@
         try {
             const status = await fetchJson('http://localhost:8000/api/system_status');
             
-            // Default path context update
-            if (status.os === 'Linux') document.getElementById('targetPath').value = '/';
+            // Linux visual updates & restrictions
+            if (status.os === 'Linux') {
+                document.getElementById('targetPath').value = '/home/';
+                
+                // Disable Windows-only features visually
+                const windowsWarningHtml = `
+                    <div style="background: #f7e8eb; color: var(--danger); padding: 16px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 1px solid rgba(143,52,67,0.2);">
+                        <strong><i class="material-icons" style="vertical-align: middle;">block</i> OS Compatibility Lock</strong><br>
+                        This feature relies on the Windows Registry and AppxPackages. It cannot be run on Linux.
+                    </div>`;
 
-            // Engage Lockdown Visuals
+                // Inject warnings into the Windows tabs
+                document.getElementById('tab-windows').insertAdjacentHTML('afterbegin', windowsWarningHtml);
+                document.getElementById('tab-debloat').insertAdjacentHTML('afterbegin', windowsWarningHtml);
+
+                // Physically disable the action buttons in those tabs
+                document.querySelectorAll('#tab-windows button, #tab-debloat button').forEach(btn => {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.4';
+                    btn.style.cursor = 'not-allowed';
+                });
+            }
+
+            // Engage Lockdown Visuals for Root Mode
             if (status.is_root) {
                 document.getElementById('rootBanner').style.display = 'block';
                 
@@ -374,6 +404,7 @@
     // --- 1. VISUAL MAPPER ---
     document.getElementById('runMapperBtn').addEventListener('click', async () => {
         const path = document.getElementById('targetPath').value;
+        const ignore = document.getElementById('ignoreFolders').value;
         const loader = document.getElementById('mapperLoader');
         const chartDiv = document.getElementById('chart');
 
@@ -381,7 +412,8 @@
         loader.style.display = 'block';
 
         try {
-            const data = await fetchJson(`http://localhost:8000/api/scan?target_path=${encodeURIComponent(path)}`);
+            const url = `http://localhost:8000/api/scan?target_path=${encodeURIComponent(path)}&ignore_folders=${encodeURIComponent(ignore)}`;
+            const data = await fetchJson(url);
             const trace = [{
                 type: "sunburst", ids: data.ids, labels: data.labels,
                 parents: data.parents, values: data.values,
@@ -398,6 +430,7 @@
     // --- 2. DEDUPLICATOR ---
     document.getElementById('runDedupBtn').addEventListener('click', async () => {
         const path = document.getElementById('targetPath').value;
+        const ignore = document.getElementById('ignoreFolders').value;
         const loader = document.getElementById('dedupLoader');
         const resultsDiv = document.getElementById('dedupResults');
         const deleteRow = document.getElementById('deleteActionRow');
@@ -407,7 +440,8 @@
         loader.style.display = 'block';
 
         try {
-            const duplicates = await fetchJson(`http://localhost:8000/api/duplicates?target_path=${encodeURIComponent(path)}`);
+            const url = `http://localhost:8000/api/duplicates?target_path=${encodeURIComponent(path)}&ignore_folders=${encodeURIComponent(ignore)}`;
+            const duplicates = await fetchJson(url);
             
             if (duplicates.length === 0) {
                 resultsDiv.innerHTML = '<p class="muted" style="text-align: center; padding: 40px;">Drive is clean! No duplicates found.</p>';
@@ -625,13 +659,15 @@
 
     document.getElementById('scanHogsBtn').addEventListener('click', async () => {
         const path = document.getElementById('targetPath').value;
+        const ignore = document.getElementById('ignoreFolders').value;
         const loader = document.getElementById('hogsLoader');
         hogsResultsDiv.innerHTML = '';
         deleteHogsRow.style.display = 'none';
         loader.style.display = 'block';
 
         try {
-            const files = await fetchJson(`http://localhost:8000/api/radar/top50?target_path=${encodeURIComponent(path)}`);
+            const url = `http://localhost:8000/api/radar/top50?target_path=${encodeURIComponent(path)}&ignore_folders=${encodeURIComponent(ignore)}`;
+            const files = await fetchJson(url);
             if (files.length === 0) {
                 hogsResultsDiv.innerHTML = '<p class="muted" style="text-align: center;">No large files found.</p>';
                 return;
@@ -664,13 +700,15 @@
 
     document.getElementById('scanStaleBtn').addEventListener('click', async () => {
         const path = document.getElementById('targetPath').value;
+        const ignore = document.getElementById('ignoreFolders').value;
         const loader = document.getElementById('staleLoader');
         staleResultsDiv.innerHTML = '';
         deleteStaleRow.style.display = 'none';
         loader.style.display = 'block';
 
         try {
-            const files = await fetchJson(`http://localhost:8000/api/radar/stale?target_path=${encodeURIComponent(path)}`);
+            const url = `http://localhost:8000/api/radar/stale?target_path=${encodeURIComponent(path)}&ignore_folders=${encodeURIComponent(ignore)}`;
+            const files = await fetchJson(url);
             if (files.length === 0) {
                 staleResultsDiv.innerHTML = '<p class="muted" style="text-align: center;">No old stale files found!</p>';
                 return;
@@ -720,7 +758,7 @@
     document.getElementById('executeHogsBtn').addEventListener('click', () => handleRadarDelete('executeHogsBtn', 'scanHogsBtn'));
     document.getElementById('executeStaleBtn').addEventListener('click', () => handleRadarDelete('executeStaleBtn', 'scanStaleBtn'));
 
-    // Bonus: Make the global Set Target button refresh the current active tab
+    //Make the global Set Target button refresh the current active tab
     document.getElementById('globalScanBtn').addEventListener('click', () => {
         const activeTabBtn = document.querySelector('.tab-btn.active');
         if (activeTabBtn.dataset.target === 'tab-mapper') document.getElementById('runMapperBtn').click();

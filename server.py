@@ -56,9 +56,9 @@ class DebloatRequest(BaseModel):
     packages: list[str]
 
 
-# ==========================================
+
 # SYSTEM GUARDRAILS (The Kill-Switch)
-# ==========================================
+
 def is_admin():
     """Cross-platform check for elevated privileges."""
     if platform.system() == "Windows":
@@ -67,7 +67,7 @@ def is_admin():
         except:
             return False
     else:
-        # Linux / macOS check for root
+        # Linux check for root
         return os.getuid() == 0
 
 def check_root_lockdown():
@@ -86,11 +86,15 @@ def check_root_lockdown():
 # TAB 1: VISUAL DISK MAPPER
 # ==========================================
 @app.get("/api/scan")
-def scan_directory(target_path: str = "."):
+def scan_directory(target_path: str = ".", ignore_folders: str = ""):
+
     if not os.path.exists(target_path):
         raise HTTPException(status_code=404, detail="Directory not found")
+    
+    ignore_list = [f.strip() for f in ignore_folders.split(",")] if ignore_folders else []
+
     try:
-        raw_tree = build_storage_tree(target_path)
+        raw_tree = build_storage_tree(target_path, ignore_folders=ignore_list)
         return flatten_for_plotly(raw_tree)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
