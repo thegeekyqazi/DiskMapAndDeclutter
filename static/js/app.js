@@ -75,9 +75,16 @@
     });
 
     // --- 1. VISUAL MAPPER ---
+    
     document.getElementById('runMapperBtn').addEventListener('click', async () => {
         const path = document.getElementById('targetPath').value;
         const ignore = document.getElementById('ignoreFolders').value;
+        
+        //Grab the selected unit and its mathematical divisor
+        const unitSelect = document.getElementById('unitSelector');
+        const divisor = parseFloat(unitSelect.value);
+        const suffix = unitSelect.options[unitSelect.selectedIndex].text;
+
         const loader = document.getElementById('mapperLoader');
         const chartDiv = document.getElementById('chart');
 
@@ -87,19 +94,26 @@
         try {
             const url = `http://localhost:8000/api/scan?target_path=${encodeURIComponent(path)}&ignore_folders=${encodeURIComponent(ignore)}`;
             const data = await fetchJson(url);
+            
+            // Scale all raw bytes down to the selected unit
+            const scaledValues = data.values.map(v => v / divisor);
+
             const trace = [{
-                type: "sunburst", ids: data.ids, labels: data.labels,
-                parents: data.parents, values: data.values,
-                branchvalues: 'total', maxdepth: 3,
-                textinfo: "label+value+percent parent",
-                hovertemplate: '<b>%{label}</b><br>Size: %{value} bytes<br><extra></extra>',
+                type: "sunburst", 
+                ids: data.ids, 
+                labels: data.labels,
+                parents: data.parents, 
+                values: scaledValues,
+                branchvalues: 'total', 
+                maxdepth: 3,
+                texttemplate: `%{label}<br>%{value:.2f} ${suffix}`,
+                hovertemplate: `<b>%{label}</b><br>Size: %{value:.2f} ${suffix}<br>Share of parent: %{percentParent:.1%}<extra></extra>`,
                 marker: { line: { width: 1, color: '#f6efe4' } }
             }];
             Plotly.newPlot(chartDiv, trace, { margin: { l: 0, r: 0, b: 0, t: 0 }, paper_bgcolor: 'transparent', sunburstcolorway: ["#24543f","#b17d3f","#3b6695","#8f4f3b","#607d5a"] });
         } catch (error) { alert("Mapper Error: " + error.message); } 
         finally { loader.style.display = 'none'; }
     });
-
     // --- 2. DEDUPLICATOR ---
     document.getElementById('runDedupBtn').addEventListener('click', async () => {
         const path = document.getElementById('targetPath').value;

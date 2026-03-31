@@ -7,8 +7,6 @@
     <link rel="stylesheet" href="/static/css/styles.css">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-
-    
 </head>
 <body>
 
@@ -68,10 +66,16 @@
                     <h2>Storage Map</h2>
                     <p class="muted">Interactive sunburst chart. Click rings to drill down into subfolders.</p>
                 </div>
-                <button id="runMapperBtn"><i class="material-icons">play_arrow</i> Generate Map</button>
-            </div>
-            
-            <div id="mapperLoader" class="loader"><i class="material-icons" style="animation: spin 1s linear infinite;">autorenew</i> Analyzing Directory Structure...</div>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <select id="unitSelector" style="padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: #fffdfa; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer;">
+                        <option value="1">Bytes</option>
+                        <option value="1024">KB</option>
+                        <option value="1048576" selected>MB</option>
+                        <option value="1073741824">GB</option>
+                    </select>
+                    <button id="runMapperBtn"><i class="material-icons">play_arrow</i> Generate Map</button>
+                </div>
+            </div> <div id="mapperLoader" class="loader"><i class="material-icons" style="animation: spin 1s linear infinite;">autorenew</i> Analyzing Directory Structure...</div>
             <div id="chart"></div>
         </section>
     </div>
