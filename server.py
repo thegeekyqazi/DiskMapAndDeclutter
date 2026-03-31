@@ -3,8 +3,11 @@ import sys
 import uvicorn
 import platform
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+
 
 # --- Universal Custom Engines ---
 from ScannerEngine import build_storage_tree, flatten_for_plotly
@@ -28,7 +31,7 @@ else:
     def disable_windows_telemetry(): return {"status": "error", "message": "Privacy Tweaks are Windows-only."}
 
 app = FastAPI(title="DeepDrive API")
-
+app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/api/system_status")
 def system_status():
     """Tells the frontend if we are in Read-Only Root Mode."""
