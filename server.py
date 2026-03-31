@@ -1,21 +1,42 @@
 import os
 import sys
-import ctypes
 import uvicorn
+import platform
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# --- Import All Custom Engines ---
+# --- Universal Custom Engines ---
 from ScannerEngine import build_storage_tree, flatten_for_plotly
 from deduplicator import find_duplicates, delete_selected_files
-from TempEngine import scan_temp_space, flush_temp_files
-from GhostHunter import find_ghost_folders, delete_ghost_folders
-from DebloatEngine import scan_bloatware, remove_bloatware, disable_windows_telemetry
 from AnalysisEngine import get_top_50_files, get_stale_files
+
+# --- OS-Specific Imports & Stubs ---
+if platform.system() == "Windows":
+    import ctypes
+    from TempEngine import scan_temp_space, flush_temp_files
+    from GhostHunter import find_ghost_folders, delete_ghost_folders
+    from DebloatEngine import scan_bloatware, remove_bloatware, disable_windows_telemetry
+else:
+    # Safe Linux Stubs: Prevents import crashes and feeds empty data to Windows UI tabs
+    def find_ghost_folders(): return []
+    def delete_ghost_folders(paths): return {"deleted": [], "failed": paths, "freed_bytes": 0}
+    def scan_temp_space(): return {"total_bytes": 0, "total_files": 0}
+    def flush_temp_files(): return {"deleted_count": 0, "freed_bytes": 0, "locked_count": 0}
+    def scan_bloatware(): return []
+    def remove_bloatware(packages): return {"success": [], "failed": packages}
+    def disable_windows_telemetry(): return {"status": "error", "message": "Privacy Tweaks are Windows-only."}
+
 app = FastAPI(title="DeepDrive API")
 
-# Allow the frontend to communicate with this server
+@app.get("/api/system_status")
+def system_status():
+    """Tells the frontend if we are in Read-Only Root Mode."""
+    is_root_mode = False
+    if platform.system() == "Linux" and is_admin():
+        is_root_mode = True
+    return {"is_root": is_root_mode, "os": platform.system()}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -36,6 +57,32 @@ class DebloatRequest(BaseModel):
 
 
 # ==========================================
+# SYSTEM GUARDRAILS (The Kill-Switch)
+# ==========================================
+def is_admin():
+    """Cross-platform check for elevated privileges."""
+    if platform.system() == "Windows":
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except:
+            return False
+    else:
+        # Linux / macOS check for root
+        return os.getuid() == 0
+
+def check_root_lockdown():
+    """
+    If running as root on Linux, DeepDrive is strictly Read-Only.
+    This prevents accidental deletion of critical system files.
+    """
+    if platform.system() == "Linux" and is_admin():
+        raise HTTPException(
+            status_code=403, 
+            detail="SAFETY LOCKDOWN: DeepDrive is running as Root. All deletion operations are disabled to protect the OS."
+        )
+
+
+# ==========================================
 # TAB 1: VISUAL DISK MAPPER
 # ==========================================
 @app.get("/api/scan")
@@ -47,7 +94,6 @@ def scan_directory(target_path: str = "."):
         return flatten_for_plotly(raw_tree)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
-
 
 # ==========================================
 # TAB 2: SMART DEDUPLICATOR
@@ -63,17 +109,16 @@ def get_duplicates(target_path: str = "."):
 
 @app.post("/api/delete")
 def delete_files(request: DeleteRequest):
+    check_root_lockdown() # ⚡ Safety Intercept
     if not request.file_paths:
         raise HTTPException(status_code=400, detail="No files provided for deletion.")
     return delete_selected_files(request.file_paths)
 
-
 # ==========================================
-# TAB 3: WINDOWS DEEP CLEAN (Ghosts & Temp)
+# TAB 3: WINDOWS DEEP CLEAN
 # ==========================================
 @app.get("/api/ghosts")
 def get_ghosts():
-    """Scans the registry and AppData for orphaned software folders."""
     try:
         return find_ghost_folders()
     except Exception as e:
@@ -81,7 +126,6 @@ def get_ghosts():
 
 @app.get("/api/temp/scan")
 def scan_temp():
-    """Calculates the total size of junk in the Windows Temp folders."""
     try:
         return scan_temp_space()
     except Exception as e:
@@ -89,7 +133,7 @@ def scan_temp():
 
 @app.post("/api/temp/flush")
 def flush_temp():
-    """Aggressively deletes contents of Windows Temp folders."""
+    check_root_lockdown() # ⚡ Safety Intercept
     try:
         return flush_temp_files()
     except Exception as e:
@@ -97,7 +141,7 @@ def flush_temp():
     
 @app.post("/api/ghosts/delete")
 def delete_ghosts(request: DeleteFolderRequest):
-    """Accepts a list of folder paths and recursively deletes them."""
+    check_root_lockdown() # ⚡ Safety Intercept
     if not request.folder_paths:
         raise HTTPException(status_code=400, detail="No folders provided for deletion.")
     try:
@@ -105,13 +149,11 @@ def delete_ghosts(request: DeleteFolderRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ghost Deletion Error: {str(e)}")
 
-
 # ==========================================
 # TAB 4: OS DEBLOATER & PRIVACY
 # ==========================================
 @app.get("/api/debloat/scan")
 def api_scan_bloatware():
-    """Queries PowerShell for installed AppxPackages matching the bloatware list."""
     try:
         return scan_bloatware()
     except Exception as e:
@@ -119,7 +161,7 @@ def api_scan_bloatware():
 
 @app.post("/api/debloat/remove")
 def api_remove_bloatware(request: DebloatRequest):
-    """Executes the Remove-AppxPackage command for selected bloatware."""
+    check_root_lockdown() # ⚡ Safety Intercept
     if not request.packages:
         raise HTTPException(status_code=400, detail="No packages provided.")
     try:
@@ -129,14 +171,14 @@ def api_remove_bloatware(request: DebloatRequest):
 
 @app.post("/api/debloat/telemetry")
 def api_disable_telemetry():
-    """Applies Windows Registry tweaks to disable Microsoft Telemetry."""
+    check_root_lockdown() # ⚡ Safety Intercept
     result = disable_windows_telemetry()
     if result["status"] == "error":
         raise HTTPException(status_code=403, detail=result["message"])
     return result
 
 # ==========================================
-# TAB 5: FILE RADAR (Top 50 & Stale)
+# TAB 5: FILE RADAR
 # ==========================================
 @app.get("/api/radar/top50")
 def api_top50(target_path: str = "."):
@@ -155,35 +197,27 @@ def api_stale(target_path: str = "."):
         return get_stale_files(target_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-# ==========================================
-# WINDOWS UAC ELEVATION & BOOTLOADER
-# ==========================================
-def is_admin():
-    """Checks if the current Python process has Administrator privileges."""
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
-        return False
 
+# ==========================================
+# CROSS-PLATFORM BOOTLOADER
+# ==========================================
 if __name__ == "__main__":
-    if not is_admin():
-        print("DeepDrive requires Administrator privileges for the OS Debloater.")
-        print("Triggering UAC prompt...")
-        
-        # This tells Windows to relaunch this script, but elevated (UAC Prompt)
-        ctypes.windll.shell32.ShellExecuteW(
-            None, 
-            "runas", 
-            sys.executable, 
-            os.path.abspath(__file__), 
-            None, 
-            1
-        )
-        # Exit this non-admin instance immediately
-        sys.exit()
-
-    # If the code reaches here, the user clicked "Yes" on the UAC prompt
-    print("Elevated privileges confirmed. Booting DeepDrive Server...")
+    current_os = platform.system()
     
-    # Start the Uvicorn server programmatically
+    if current_os == "Windows":
+        if not is_admin():
+            print("DeepDrive requires Administrator privileges for the OS Debloater.")
+            print("Triggering UAC prompt...")
+            ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, os.path.abspath(__file__), None, 1)
+            sys.exit()
+        print("Elevated Windows privileges confirmed. Booting DeepDrive Server...")
+        
+    elif current_os == "Linux":
+        if is_admin():
+            print("\n[!] WARNING: Running as Root. DeepDrive is locked in Read-Only Mode.")
+            print("    You can safely map the '/' filesystem, but deletions are disabled.\n")
+        else:
+            print("\n[*] Running in User Mode. You can delete files in your /home directory.")
+            print("    (To view the entire '/' filesystem, restart app with 'sudo python3 server.py')\n")
+
     uvicorn.run("server:app", host="127.0.0.1", port=8000, reload=True)

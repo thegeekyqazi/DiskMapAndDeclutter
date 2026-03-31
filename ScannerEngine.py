@@ -1,18 +1,20 @@
 import os
-from pathlib import Path
 import platform
+from pathlib import Path
+
+# ⚡ VIRTUAL FILESYSTEM BLACKLIST
+# These Linux directories map directly to Kernel/RAM. Scanning them will crash the app.
+LINUX_BLACKLIST = {
+    "/proc", "/sys", "/dev", "/run", "/snap", "/var/lib/lxcfs"
+}
 
 def build_storage_tree(root_path: str) -> dict:
     target_dir = Path(root_path).resolve()
     current_os = platform.system()
+
     if current_os == "Windows":
-        # Windows-specific safety check
         if str(target_dir).lower().startswith(r"c:\windows"):
             raise PermissionError("Safety Guardrail: Scanning C:\\Windows is strictly prohibited.")
-    elif current_os == "Linux":
-        # Linux-specific safety check
-        if str(target_dir).startswith("/boot") or str(target_dir) == "/":
-            raise PermissionError("Safety Guardrail: Scanning root/boot is prohibited.")
 
     def _scan(current_path: str) -> dict:
         node = {
@@ -22,12 +24,15 @@ def build_storage_tree(root_path: str) -> dict:
             "children": []
         }
 
+        # ⚡ GUARDRAIL: Instantly abort if entering a virtual kernel directory
+        if current_os == "Linux" and current_path in LINUX_BLACKLIST:
+            return node
+
         try:
             with os.scandir(current_path) as it:
                 for entry in it:
                     if entry.is_file(follow_symlinks=False):
                         try:
-                            
                             node["size"] += entry.stat(follow_symlinks=False).st_size
                         except (OSError, FileNotFoundError):
                             pass
@@ -36,14 +41,13 @@ def build_storage_tree(root_path: str) -> dict:
                         if entry.name in ['.git', 'node_modules', '__pycache__']:
                             continue
                             
+                        # Recursively scan the child directory
                         child_node = _scan(entry.path)
                         node["size"] += child_node["size"]
                         
-                
-                       
+                        # Only keep children larger than 1MB to keep the UI snappy
                         if child_node["size"] > 1_048_576:
                             node["children"].append(child_node)
-                        
                             
         except (PermissionError, OSError):
             pass
@@ -79,6 +83,3 @@ def flatten_for_plotly(tree_node: dict) -> dict:
         "parents": parents,
         "values": values
     }
-
-
-#print(build_storage_tree("."))

@@ -34,6 +34,22 @@
             min-height: 100vh;
         }
 
+        /* --- ROOT WARNING BANNER --- */
+        #rootBanner {
+            display: none; /* Hidden by default */
+            background: linear-gradient(135deg, #b71c1c, #7f0000);
+            color: #fff;
+            padding: 16px 24px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(183, 28, 28, 0.4);
+            position: sticky;
+            top: 0;
+            z-index: 9999;
+        }
+        #rootBanner h3 { margin: 0 0 8px 0; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 1.2em; }
+        #rootBanner ul { margin: 8px 0 0 0; padding: 0; list-style: none; font-size: 0.95em; opacity: 0.9; }
+        #rootBanner li { margin-bottom: 4px; }
+
         main { width: min(1200px, calc(100% - 48px)); margin: 40px auto; }
         
         h1, h2, h3 { margin: 0; line-height: 1.2; }
@@ -73,7 +89,7 @@
             display: inline-flex; align-items: center; gap: 8px;
         }
         button:active { transform: translateY(2px); }
-        button:disabled { opacity: 0.6; cursor: wait; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
         button.danger { background: linear-gradient(135deg, var(--danger), #631e2b); box-shadow: 0 10px 20px rgba(143,52,67,.2); }
 
         /* Pills & Badges */
@@ -107,6 +123,15 @@
     </style>
 </head>
 <body>
+
+<div id="rootBanner">
+    <h3><i class="material-icons">gavel</i> SAFETY LOCKDOWN: ROOT MODE ACTIVE</h3>
+    <p style="margin: 0; font-weight: bold;">DeepDrive is locked in Strictly Read-Only Mode to protect your Linux kernel and operating system.</p>
+    <ul>
+        <li>✔ You can safely map and view the entire root (/) filesystem.</li>
+        <li>✖ All file deletion, registry tweaking, and cache flushing actions are disabled.</li>
+    </ul>
+</div>
 
 <main>
     <section class="hero">
@@ -303,16 +328,6 @@
         document.getElementById('stat-wasted').textContent = fmtBytes(globalWastedBytes);
     };
 
-    // --- TAB LOGIC ---
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById(btn.dataset.target).classList.add('active');
-        });
-    });
-
     // --- API CALLER ---
     const fetchJson = async (url, options) => {
         const r = await fetch(url, options);
@@ -322,6 +337,39 @@
         }
         return await r.json();
     };
+
+    // --- ⚡ ROOT MODE DETECTOR & UI LOCKDOWN ---
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const status = await fetchJson('http://localhost:8000/api/system_status');
+            
+            // Default path context update
+            if (status.os === 'Linux') document.getElementById('targetPath').value = '/';
+
+            // Engage Lockdown Visuals
+            if (status.is_root) {
+                document.getElementById('rootBanner').style.display = 'block';
+                
+                // Find all deletion/mutating buttons and disable them
+                document.querySelectorAll('.danger, #telemetryBtn').forEach(btn => {
+                    btn.disabled = true;
+                    btn.title = "Action permanently disabled in Root View mode";
+                });
+            }
+        } catch (e) {
+            console.log("Could not fetch system status. Assuming normal mode.", e);
+        }
+    });
+
+    // --- TAB LOGIC ---
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.target).classList.add('active');
+        });
+    });
 
     // --- 1. VISUAL MAPPER ---
     document.getElementById('runMapperBtn').addEventListener('click', async () => {
@@ -428,7 +476,11 @@
             const data = await fetchJson('http://localhost:8000/api/temp/scan');
             document.getElementById('tempSizeText').textContent = fmtBytes(data.total_bytes);
             document.getElementById('tempCountText').textContent = data.total_files;
-            if (data.total_bytes > 0) document.getElementById('flushTempBtn').disabled = false;
+            
+            // Only enable the flush button if we are NOT locked down in root mode
+            if (data.total_bytes > 0 && document.getElementById('rootBanner').style.display !== 'block') {
+                document.getElementById('flushTempBtn').disabled = false;
+            }
         } catch (error) { alert("Temp Scan Error: " + error.message); }
         finally { document.getElementById('scanTempBtn').textContent = 'Recalculate'; }
     });
