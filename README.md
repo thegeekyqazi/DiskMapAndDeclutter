@@ -62,17 +62,20 @@ Deleting system files is dangerous. DeepDrive is built with extreme safety const
 Because the core engines rely entirely on Python's standard library, the dependency footprint is incredibly small.
 
 **1. Clone the repository**
+```bash
 git clone [https://github.com/thegeekyqazi/DeepDrive.git](https://github.com/thegeekyqazi/DeepDrive.git)
 cd DeepDrive
-
+```
 **2. Setup a Virtual Environment & Install API requirements**
+```bash
 python3 -m venv venv
 source venv/bin/activate  # On Windows use: venv\Scripts\activate
 pip install fastapi uvicorn pydantic
-
+```
 **3. Boot the application**
+```bash
 python server.py
-
+```
 *Note: On Windows, DeepDrive will automatically prompt you for Administrator privileges (UAC). On Linux, it will safely boot into User Mode restricted to your `/home` directory.*
 
 ---
