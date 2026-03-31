@@ -2,7 +2,7 @@ import os
 import platform
 from pathlib import Path
 
-# ⚡ VIRTUAL FILESYSTEM BLACKLIST
+#VIRTUAL FILESYSTEM BLACKLIST
 # These Linux directories map directly to Kernel/RAM. Scanning them will crash the app.
 LINUX_BLACKLIST = {
     "/proc", "/sys", "/dev", "/run", "/snap", "/var/lib/lxcfs"
