@@ -40,7 +40,7 @@ Inspired by the legendary CTT WinUtil project, this module safely removes pre-in
 ## 🔒 Safety & OS Guardrails
 Deleting system files is dangerous. DeepDrive is built with extreme safety constraints and cross-platform awareness:
 
-* **Linux Root Lockdown:** If you run the application with `sudo` (Please don't), DeepDrive will detect the elevated privileges and enter a strict **Read-Only System Mode**. A massive red UI banner will appear, allowing you to safely map the entire `/` filesystem while completely paralyzing all API deletion endpoints to protect the Linux kernel.
+* **Linux Root Lockdown:** If you run the application with `sudo` (**Please don't**), DeepDrive will detect the elevated privileges and enter a strict **Read-Only System Mode**. A massive red UI banner will appear, allowing you to safely map the entire `/` filesystem while completely paralyzing all API deletion endpoints to protect the Linux kernel.
 * **Virtual Filesystem Blacklist:** When running on Linux, the backend scanner employs a hardcoded blacklist (`/proc`, `/sys`, `/dev`, etc.) to prevent the app from getting trapped in infinite RAM/Kernel loops.
 * **Smart OS UI Locks:** The frontend actively queries the backend OS on boot. If running on Linux, Windows-specific tabs (Registry/Appx) are visually locked, badged, and disabled.
 * **Native UAC Elevation:** On Windows, the app automatically triggers the native Administrator prompt on boot to ensure registry tweaks are handled securely.
